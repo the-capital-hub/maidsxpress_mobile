@@ -19,4 +19,8 @@ class PngAssetPath {
   static const String cookImg = 'assets/image/cook.png';
   static const String elderImg = 'assets/image/elder.png';
   static const String paysuccessImg = 'assets/image/paysuccess.png';
+  static const String gpayImg = 'assets/image/gpay.png';
+  static const String phonepeImg = 'assets/image/phonepe.png';
+  static const String paytmImg = 'assets/image/paytm.png';
+  static const String mapImg = 'assets/image/map.png';
 }
