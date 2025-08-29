@@ -55,7 +55,7 @@ class MyCustomTextField {
           floatingLabelBehavior: FloatingLabelBehavior.auto,
           labelText: lableText,
           hintText: hintText,
-          fillColor:fillColor?? AppColors.transparent,
+          fillColor: fillColor ?? AppColors.transparent,
           filled: true,
           labelStyle: GoogleFonts.outfit(
               textStyle: TextStyle(
@@ -63,10 +63,10 @@ class MyCustomTextField {
             fontWeight: FontWeight.w500,
             color: textClr ?? AppColors.primary,
           )),
-           hintStyle: GoogleFonts.outfit(
+          hintStyle: GoogleFonts.outfit(
               textStyle: TextStyle(
             fontSize: 14,
-            color: textClr ?? AppColors.black54 ,
+            color: textClr ?? AppColors.black54,
           )),
           alignLabelWithHint: true,
           enabledBorder: OutlineInputBorder(

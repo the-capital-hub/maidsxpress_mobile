@@ -1,43 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:maidxpress/controller/service/service_controller.dart';
+
+import 'controller/auth/auth_controller.dart';
+import 'screen/authScreen/loginScreen/login_screen.dart';
+import 'screen/homeScreen/home_screen.dart';
 import 'screen/landingScreen/landing_screen.dart';
+
 import 'screen/onboardingScreen/onboarding_screens.dart';
-import 'utils/getStore/get_store.dart';
 
 void main() async {
+  // Initialize Flutter bindings
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize storage
   await GetStorage.init();
-  GetStoreData.loadUserData();
-  runApp(const MyApp());
+
+  // Initialize controllers
+  Get.put(AuthController());
+  Get.put(ServicesController());
+
+  // Check if it's first time
+  final isFirstTime = GetStorage().read('isFirstTime') ?? true;
+  final token = GetStorage().read('token');
+
+  // Run the app with initial route
+  runApp(MyApp(
+    initialRoute: token != null && token.toString().isNotEmpty
+        ? '/landing' // Changed from '/home' to '/landing'
+        : isFirstTime
+            ? '/onboarding'
+            : '/login',
+  ));
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class MyApp extends StatelessWidget {
+  final String initialRoute;
 
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
+  const MyApp({super.key, required this.initialRoute});
 
-class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'Maidxpress',
       debugShowCheckedModeBanner: false,
-      home: OnboardingScreen(),
+      initialRoute: initialRoute,
+      getPages: [
+        GetPage(name: '/onboarding', page: () => OnboardingScreen()),
+        GetPage(name: '/login', page: () => LoginScreen()),
+        GetPage(name: '/landing', page: () => const LandingScreen()),
+        GetPage(name: '/home', page: () => const HomeScreen()),
+      ],
       theme: ThemeData(
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         switchTheme: SwitchThemeData(
           trackOutlineColor: WidgetStateProperty.resolveWith<Color?>(
-            (states) {
-              return Colors.transparent;
-            },
+            (states) => Colors.transparent,
           ),
           trackOutlineWidth: WidgetStateProperty.resolveWith<double?>(
-            (states) {
-              return 0.0;
-            },
+            (states) => 0.0,
           ),
         ),
       ),

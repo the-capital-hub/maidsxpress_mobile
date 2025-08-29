@@ -60,15 +60,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   fontWeight: FontWeight.bold,
                   color: AppColors.black),
 
-              ListView.builder(
-                itemCount: 5,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemBuilder: (BuildContext context, int index) {
-                  return const ServiceCardWidget();
-                },
-              ),
+              // ListView.builder(
+              //   itemCount: 5,
+              //   shrinkWrap: true,
+              //   physics: const NeverScrollableScrollPhysics(),
+              //   padding: const EdgeInsets.symmetric(vertical: 8),
+              //   itemBuilder: (BuildContext context, int index) {
+              //     return const ServiceCardWidget();
+              //   },
+              // ),
             ],
           ),
         ),

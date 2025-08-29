@@ -16,35 +16,49 @@ class AppButton {
     double? borderRadius,
     double? width,
     double? fontSize,
+    bool isLoading = false,
   }) {
     return Container(
       width: width ?? Get.width,
       height: height ?? 48,
       decoration: BoxDecoration(
-        color: bgColor ?? AppColors.primary,
+        color: (onButtonPressed == null || isLoading) 
+            ? (bgColor ?? AppColors.primary).withOpacity(0.7)
+            : bgColor ?? AppColors.primary,
         borderRadius: BorderRadius.circular(borderRadius ?? 100),
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           elevation: 0,
           shape: const StadiumBorder(),
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          backgroundColor:
-              Colors.transparent, // Make button background transparent
-          shadowColor: Colors.transparent, // Remove any shadow
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
         ),
-        onPressed: onButtonPressed,
+        onPressed: isLoading ? null : onButtonPressed,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Opacity(opacity: 0, child: suffixIcon ?? const SizedBox()),
+            if (isLoading) ...[
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             TextWidget(
               text: title,
               textSize: fontSize ?? 14,
               fontWeight: FontWeight.w500,
-              color: textColor ?? AppColors.white,
+              color: (onButtonPressed == null || isLoading)
+                  ? (textColor ?? AppColors.white).withOpacity(0.7)
+                  : textColor ?? AppColors.white,
             ),
-            suffixIcon ?? const SizedBox()
           ],
         ),
       ),

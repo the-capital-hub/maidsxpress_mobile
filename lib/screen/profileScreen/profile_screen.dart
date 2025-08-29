@@ -1,6 +1,7 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // if you use GetX
+import 'package:get/get.dart';
+import 'package:maidxpress/controller/auth/auth_controller.dart';
 import 'package:maidxpress/screen/mapLocationScreen/map_location_screen.dart';
 import 'package:maidxpress/screen/paymentOptionScreen/payment_Option_Screen.dart';
 import 'package:maidxpress/screen/profileScreen/bookingHistoryScreen/booking_history_screen.dart';
@@ -109,7 +110,31 @@ class ProfileScreen extends StatelessWidget {
                 FadeInUp(
                   child: Center(
                     child: OutlinedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Get.dialog(
+                          AlertDialog(
+                            title: const Text('Logout'),
+                            content:
+                                const Text('Are you sure you want to logout?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Get.back(),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Get.back();
+                                  AuthController.to.logoutUser();
+                                },
+                                child: const Text(
+                                  'Logout',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.redColor,
                         side: const BorderSide(color: AppColors.redColor),
@@ -128,6 +153,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),

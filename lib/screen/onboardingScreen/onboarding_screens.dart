@@ -1,6 +1,7 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/utils/constant/asset_constant.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
@@ -8,10 +9,34 @@ import '../../widget/textwidget/text_widget.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../authScreen/loginScreen/login_screen.dart';
+import '../homeScreen/home_screen.dart';
 
-class OnboardingScreen extends StatelessWidget {
+class OnboardingScreen extends StatefulWidget {
+  const OnboardingScreen({super.key});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final RxInt currentPage = 0.obs;
+  final _storage = GetStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthStatus();
+  }
+
+  void _checkAuthStatus() {
+    final token = _storage.read('token');
+    if (token != null && token.toString().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.offAll(() => const HomeScreen());
+      });
+    }
+  }
 
   final List<Map<String, String>> onboardingData = [
     {

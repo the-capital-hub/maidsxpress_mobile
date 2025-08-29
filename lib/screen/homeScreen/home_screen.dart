@@ -3,15 +3,15 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:get/get.dart';
+import 'package:maidxpress/controller/service/service_controller.dart';
+import 'package:maidxpress/models/service_model.dart';
 import 'package:maidxpress/screen/homeScreen/serviceCard/service_card_widget.dart';
 import 'package:maidxpress/screen/notificationScreen/notification_screen.dart';
+import 'package:maidxpress/screen/seeAllServiceScreen/see_all_service_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
-import 'package:maidxpress/utils/constant/app_var.dart';
 import 'package:maidxpress/utils/constant/asset_constant.dart';
 import 'package:maidxpress/widget/text_field/text_field.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
-
-import '../seeAllServiceScreen/see_all_service_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,11 +29,124 @@ class _HomeScreenState extends State<HomeScreen> {
     PngAssetPath.bannerImg,
   ];
 
+  // Dynamic Xpress options based on available services
+  List<Map<String, dynamic>> get xpressOptions {
+    final controller = Get.find<ServicesController>();
+
+    // Start with "All" option
+    final options = <Map<String, dynamic>>[
+      {
+        'id': 'all',
+        'image': PngAssetPath.homeImg,
+        'title': 'All Services',
+        'tag': 'all',
+      },
+    ];
+
+    if (controller.services.isEmpty) return options;
+
+    // Add unique services based on their tags
+    final addedTags = <String>{};
+    for (var service in controller.services) {
+      if (service.tag.isNotEmpty && !addedTags.contains(service.tag)) {
+        options.add({
+          'id': service.id,
+          'image': _getServiceImage(service.tag),
+          'title': service.name,
+          'tag': service.tag,
+          'service': service,
+        });
+        addedTags.add(service.tag);
+      }
+    }
+
+    // If no services with tags found, add all services as options
+    if (options.length == 1 && controller.services.isNotEmpty) {
+      options.addAll(controller.services.map((service) => {
+            'id': service.id,
+            'image': _getServiceImage(service.name.toLowerCase()),
+            'title': service.name,
+            'tag': service.tag.isNotEmpty
+                ? service.tag
+                : service.name.toLowerCase(),
+            'service': service,
+          }));
+    }
+
+    return options;
+  }
+
+  // Helper to get appropriate image based on service type
+  String _getServiceImage(String tag) {
+    if (tag.contains('clean') || tag.contains('house'))
+      return PngAssetPath.homeImg;
+    if (tag.contains('cook') || tag.contains('meal'))
+      return PngAssetPath.cookImg;
+    if (tag.contains('care') || tag.contains('baby') || tag.contains('elder'))
+      return PngAssetPath.babycareImg;
+    return PngAssetPath.starImg; // default image
+  }
+
+  String selectedXpressOption = "all"; // Default to "All Services"
+
+  String selectedPopularService = "All";
+  final List<String> popularService = [
+    "All",
+    "Baby Care",
+    "Elderly Care",
+    "Cooking Services",
+    "Party Clean",
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final ServicesController controller = Get.find<ServicesController>();
+
     return Scaffold(
-        backgroundColor: AppColors.white,
-        body: SingleChildScrollView(
+      backgroundColor: AppColors.white,
+      body: Obx(() {
+        List<Service> filteredServices;
+        // If no services are loaded, show empty list
+        if (controller.services.isEmpty) {
+          filteredServices = [];
+        }
+        // If "All" is selected, show all services
+        else if (selectedXpressOption == "all" ||
+            selectedXpressOption.isEmpty) {
+          filteredServices = List<Service>.from(controller.services);
+        } else {
+          // Get the selected Xpress option
+          final selectedOption = xpressOptions.firstWhere(
+            (option) => option['id'] == selectedXpressOption,
+            orElse: () => {'id': '', 'title': '', 'image': '', 'tag': ''},
+          );
+
+          // Filter services based on the tag from API response
+          filteredServices = controller.services
+              .where((service) =>
+                  service.tag.toLowerCase() ==
+                  selectedOption['tag']?.toLowerCase())
+              .toList();
+        }
+
+        // For services to display, use filtered services or all if empty
+        final servicesToDisplay = filteredServices.isNotEmpty
+            ? filteredServices
+            : controller.services;
+
+        // Filter by popularService if not "All"
+        final displayedServices = selectedPopularService == "All"
+            ? servicesToDisplay
+            : servicesToDisplay
+                .where((service) =>
+                    service.tag.toLowerCase() ==
+                        selectedPopularService.toLowerCase() ||
+                    service.name
+                        .toLowerCase()
+                        .contains(selectedPopularService.toLowerCase()))
+                .toList();
+
+        return SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -46,35 +159,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    sizedTextfield,
+                    const SizedBox(height: 12),
                     const TextWidget(
                       text: "Upcoming Service",
                       textSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
-                    sizedTextfield,
+                    const SizedBox(height: 12),
                     SlideInRight(
                       duration: const Duration(milliseconds: 500),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 10),
                         decoration: BoxDecoration(
-                            border: Border.all(
-                                color: AppColors.primary, width: 0.8),
-                            borderRadius: BorderRadius.circular(10)),
+                          border:
+                              Border.all(color: AppColors.primary, width: 0.8),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         child: Row(
                           children: [
                             const CircleAvatar(
                               radius: 25,
                               backgroundColor: AppColors.primary,
                               child: CircleAvatar(
-                                  radius: 23,
-                                  backgroundColor: AppColors.white,
-                                  child: Icon(
-                                    Icons.baby_changing_station,
-                                    color: AppColors.primary,
-                                    size: 24,
-                                  )),
+                                radius: 23,
+                                backgroundColor: AppColors.white,
+                                child: Icon(
+                                  Icons.baby_changing_station,
+                                  color: AppColors.primary,
+                                  size: 24,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             const Expanded(
@@ -98,13 +213,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(8)),
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                               child: const TextWidget(
-                                  text: "Re-schedule",
-                                  color: AppColors.white,
-                                  textSize: 12),
-                            )
+                                text: "Re-schedule",
+                                color: AppColors.white,
+                                textSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -112,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              sizedTextfield,
+              const SizedBox(height: 12),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: TextWidget(
@@ -133,12 +250,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     bool isSelected =
                         selectedXpressOption == xpressOptions[index]['id']!;
                     return ZoomIn(
-                      duration:
-                          Duration(milliseconds: 300 + index * 100),
+                      duration: Duration(milliseconds: 300 + index * 100),
                       child: InkWell(
                         onTap: () {
-                          selectedXpressOption = xpressOptions[index]['id']!;
-                          setState(() {});
+                          setState(() {
+                            selectedXpressOption = xpressOptions[index]['id']!;
+                          });
                         },
                         splashColor: AppColors.transparent,
                         child: Container(
@@ -147,27 +264,29 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.white,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: AppColors.black12,
-                                  blurRadius: 12,
-                                  offset: Offset(0, 1),
-                                ),
-                              ],
-                              borderRadius: BorderRadius.circular(100)),
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.white,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: AppColors.black12,
+                                blurRadius: 12,
+                                offset: Offset(0, 1),
+                              ),
+                            ],
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: AppColors.grey200,
-                                  child: Image.asset(
-                                    xpressOptions[index]['image']!,
-                                    height: 22,
-                                  )),
+                                radius: 20,
+                                backgroundColor: AppColors.grey200,
+                                child: Image.asset(
+                                  xpressOptions[index]['image']!,
+                                  height: 22,
+                                ),
+                              ),
                               const SizedBox(width: 4),
                               TextWidget(
                                 text: xpressOptions[index]['title']!,
@@ -186,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
-              sizedTextfield,
+              const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.only(left: 12, right: 8),
                 child: Row(
@@ -207,11 +326,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const Icon(Icons.arrow_forward_ios,
-                        color: AppColors.black54, size: 16)
+                        color: AppColors.black54, size: 16),
                   ],
                 ),
               ),
-              sizedTextfield,
+              const SizedBox(height: 12),
               SizedBox(
                 height: 35,
                 child: ListView.separated(
@@ -224,12 +343,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     bool isSelected =
                         selectedPopularService == popularService[index];
                     return FadeInLeft(
-                      duration:
-                          Duration(milliseconds: 300 + index * 100),
+                      duration: Duration(milliseconds: 300 + index * 100),
                       child: InkWell(
                         onTap: () {
-                          selectedPopularService = popularService[index];
-                          setState(() {});
+                          setState(() {
+                            selectedPopularService = popularService[index];
+                          });
                         },
                         splashColor: AppColors.transparent,
                         child: Container(
@@ -237,11 +356,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.primary),
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.white,
-                              borderRadius: BorderRadius.circular(100)),
+                            border: Border.all(color: AppColors.primary),
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.white,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
                           child: Center(
                             child: TextWidget(
                               text: popularService[index],
@@ -258,32 +378,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
-              ListView.separated(
-                itemCount: 5,
-                shrinkWrap: true,
-                padding: const EdgeInsets.only(left: 12, right: 12, top: 15),
-                physics: const NeverScrollableScrollPhysics(),
-                separatorBuilder: (context, index) => const SizedBox(height: 0),
-                itemBuilder: (BuildContext context, int index) {
-                  return FadeInUp(
-                    duration: Duration(milliseconds: 400 + index * 100),
-                    child: const ServiceCardWidget(),
-                  );
-                },
-              ),
+              // Dynamic filtered services
+              controller.isLoading.value
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : displayedServices.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: TextWidget(
+                            text: "No services available for this category",
+                            textSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.grey,
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: displayedServices.length,
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.only(
+                              left: 12, right: 12, top: 15),
+                          physics: const NeverScrollableScrollPhysics(),
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (BuildContext context, int index) {
+                            return FadeInUp(
+                              duration:
+                                  Duration(milliseconds: 400 + index * 100),
+                              child: ServiceCardWidget(
+                                service: displayedServices[index],
+                              ),
+                            );
+                          },
+                        ),
             ],
           ),
-        ));
+        );
+      }),
+    );
   }
 
-  topAndBanner() {
+  Widget topAndBanner() {
     return Container(
-      padding: const EdgeInsets.only(
-        top: 50,
-        left: 12,
-        right: 12,
-        bottom: 16,
-      ),
+      padding: const EdgeInsets.only(top: 50, left: 12, right: 12, bottom: 16),
       decoration: BoxDecoration(
         color: AppColors.white,
         gradient: LinearGradient(
@@ -329,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                         textSize: 14,
                       ),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 20)
+                      const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
                     ],
                   ),
                   const TextWidget(
@@ -358,10 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // Search Bar
           Container(
             decoration: BoxDecoration(
               color: AppColors.white,
@@ -376,23 +511,22 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             child: MyCustomTextField.textField(
-                hintText: "Search for service",
-                fillColor: AppColors.white,
-                borderClr: AppColors.transparent,
-                suffixIcon: const Icon(
-                  CupertinoIcons.search,
-                  color: AppColors.primary,
-                ),
-                controller: TextEditingController()),
+              hintText: "Search for service",
+              fillColor: AppColors.white,
+              borderClr: AppColors.transparent,
+              suffixIcon: const Icon(
+                CupertinoIcons.search,
+                color: AppColors.primary,
+              ),
+              controller: TextEditingController(),
+            ),
           ),
           const SizedBox(height: 12),
-
           const TextWidget(
             text: "Best Offers for you..!",
             textSize: 18,
             fontWeight: FontWeight.w500,
           ),
-
           SizedBox(
             height: 140,
             width: double.infinity,
@@ -421,7 +555,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
           Center(
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -444,42 +577,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  String selectedXpressOption = "1";
-  final List<Map<String, String>> xpressOptions = [
-    {
-      "id": "1",
-      "image": PngAssetPath.homeImg,
-      "title": "Clean Xpress",
-    },
-    {
-      "id": "2",
-      "image": PngAssetPath.starImg,
-      "title": "Meals Xpress",
-    },
-    {
-      "id": "3",
-      "image": PngAssetPath.babycareImg,
-      "title": "Care Xpress",
-    },
-    {
-      "id": "4",
-      "image": PngAssetPath.cookImg,
-      "title": "Insta Xpress",
-    },
-    {
-      "id": "5",
-      "image": PngAssetPath.elderImg,
-      "title": "Onestop Xpress",
-    },
-  ];
-
-  String selectedPopularService = "All";
-  final List<String> popularService = [
-    "All",
-    "Baby Care",
-    "Elderly Care",
-    "Cooking Services",
-    "Party Clean"
-  ];
 }

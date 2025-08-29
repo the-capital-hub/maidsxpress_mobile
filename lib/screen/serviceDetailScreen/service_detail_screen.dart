@@ -7,12 +7,14 @@ import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/utils/constant/app_var.dart';
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
-
+import '../../models/service_model.dart';
 import '../../utils/constant/asset_constant.dart';
 import '../../widget/textwidget/text_widget.dart';
 
 class ServiceDetailScreen extends StatefulWidget {
-  const ServiceDetailScreen({super.key});
+  final Service service;
+
+  const ServiceDetailScreen({super.key, required this.service});
 
   @override
   State<ServiceDetailScreen> createState() => _ServiceDetailScreenState();
@@ -20,11 +22,16 @@ class ServiceDetailScreen extends StatefulWidget {
 
 class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   @override
-  @override
   Widget build(BuildContext context) {
+    // Calculate minimum price across all subServices
+    final startingPrice = _calculateStartingPrice(widget.service.subServices);
+
     return Scaffold(
       backgroundColor: AppColors.white,
-      appBar: HelperAppBar.appbarHelper(title: "Clean Xpress"),
+      appBar: HelperAppBar.appbarHelper(
+          title: widget.service.name.isNotEmpty
+              ? widget.service.name
+              : "Clean Xpress"),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -37,10 +44,20 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: Image.network(
-                        'https://hottouchkitchen.com/wp-content/uploads/2024/01/side-view-female-chef-kitchen-slicing-vegetables-compressed-scaled.jpg',
+                        widget.service.image.isNotEmpty
+                            ? widget.service.image
+                            : 'https://via.placeholder.com/300',
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 180,
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Icon(Icons.broken_image,
+                                size: 50, color: Colors.grey),
+                          ),
+                        ),
                       ),
                     ),
                     const Positioned(
@@ -59,10 +76,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ],
                 ),
               ),
-              sizedTextfield,
+              const SizedBox(height: 12), // Replaced sizedTextfield
               FadeInDown(
-                  child: const TextWidget(
-                text: "CleanXpress",
+                  child: TextWidget(
+                text: widget.service.name.isNotEmpty
+                    ? widget.service.name
+                    : "CleanXpress",
                 textSize: 20,
                 fontWeight: FontWeight.w600,
               )),
@@ -108,8 +127,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           color: AppColors.primary.withOpacity(0.2)),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 6),
-                      child: const TextWidget(
-                        text: "Cleaning",
+                      child: TextWidget(
+                        text: widget.service.tag.isNotEmpty
+                            ? widget.service.tag
+                            : "Cleaning",
                         textSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppColors.primary,
@@ -120,8 +141,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ),
               const SizedBox(height: 12),
               FadeInDown(
-                  child: const TextWidget(
-                text: "₹250.00",
+                  child: TextWidget(
+                text: "₹${startingPrice.toStringAsFixed(2)}",
                 textSize: 22,
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
@@ -135,44 +156,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               )),
               const SizedBox(height: 8),
               FadeIn(
-                  child: const TextWidget(
-                text:
-                    "MaidsXpress Provides Professional Brooming And Cleaning Services Designed To Keep Your Home Spotless. Our Services Include:",
+                  child: TextWidget(
+                text: widget.service.include.isNotEmpty
+                    ? widget.service.include.first.description
+                    : "MaidsXpress Provides Professional Brooming And Cleaning Services Designed To Keep Your Home Spotless. Our Services Include:",
                 textSize: 13,
                 maxLine: 3,
                 color: AppColors.black,
               )),
               const SizedBox(height: 10),
-              FadeIn(
-                  child: buildBullet(
-                icon: Icons.check_circle,
-                iconColor: AppColors.green700,
-                title: "Sweeping & Brooming",
-                desc:
-                    "Removing Dust, Dirt, And Debris From Floors To Maintain Cleanliness.",
-              )),
-              FadeIn(
-                  child: buildBullet(
-                icon: Icons.check_circle,
-                iconColor: AppColors.green700,
-                title: "Mopping & Floor Cleaning",
-                desc: "Deep Cleaning Of Floors To Eliminate Stains And Germs.",
-              )),
-              FadeIn(
-                  child: buildBullet(
-                icon: Icons.check_circle,
-                iconColor: AppColors.green700,
-                title: "Dusting & Surface Wiping",
-                desc:
-                    "Cleaning Furniture, Shelves, And Other Surfaces For A Fresh Look.",
-              )),
-              FadeIn(
-                  child: buildBullet(
-                icon: Icons.check_circle,
-                iconColor: AppColors.green700,
-                title: "Bathroom & Kitchen Cleaning",
-                desc: "Sanitizing Sinks, Countertops, Toilets, And Appliances.",
-              )),
+              // Dynamic includes
+              ...widget.service.include
+                  .map((item) => FadeIn(
+                        child: buildBullet(
+                          icon: Icons.check_circle,
+                          iconColor: AppColors.green700,
+                          title: item.displayTitle,
+                          desc: item.description.isNotEmpty
+                              ? item.description
+                              : "No details",
+                        ),
+                      ))
+                  .toList(),
               const SizedBox(height: 16),
               FadeIn(
                   child: const TextWidget(
@@ -182,42 +187,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               )),
               const SizedBox(height: 8),
               FadeIn(
-                  child: const TextWidget(
-                text:
-                    "MaidsXpress Provides A Range Of Cleaning Services Designed To Keep Your Environment Spotless. We Specialize In:",
+                  child: TextWidget(
+                text: widget.service.exclude.isNotEmpty
+                    ? widget.service.exclude.first.description
+                    : "MaidsXpress Provides A Range Of Cleaning Services Designed To Keep Your Environment Spotless. We Specialize In:",
                 textSize: 13,
                 maxLine: 3,
                 color: AppColors.black87,
               )),
               const SizedBox(height: 10),
-              FadeIn(
-                  child: buildBullet(
-                icon: Icons.cancel,
-                iconColor: AppColors.redColor,
-                title: "Vacuuming & Carpet Care",
-                desc: "Keeping Carpets Free From Dust And Allergens.",
-              )),
-              FadeInUp(
-                  child: buildBullet(
-                icon: Icons.cancel,
-                iconColor: AppColors.redColor,
-                title: "Window Washing",
-                desc: "Ensuring Your Windows Shine Brightly.",
-              )),
-              FadeInUp(
-                  child: buildBullet(
-                icon: Icons.cancel,
-                iconColor: AppColors.redColor,
-                title: "Upholstery Cleaning",
-                desc: "Revitalizing Sofas And Chairs To Look Brand New.",
-              )),
-              FadeInUp(
-                  child: buildBullet(
-                icon: Icons.cancel,
-                iconColor: AppColors.redColor,
-                title: "Post-Construction Cleanup",
-                desc: "Clearing Away Debris And Dust After Renovations.",
-              )),
+              // Dynamic excludes
+              ...widget.service.exclude
+                  .map((item) => FadeIn(
+                        child: buildBullet(
+                          icon: Icons.cancel,
+                          iconColor: AppColors.redColor,
+                          title: item.displayTitle,
+                          desc: item.description.isNotEmpty
+                              ? item.description
+                              : "No details",
+                        ),
+                      ))
+                  .toList(),
               const SizedBox(height: 16),
               FadeInLeft(
                   child: const TextWidget(
@@ -320,7 +311,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: AppButton.primaryButton(
             onButtonPressed: () {
-              Get.to(() => const SelectAreaScreen(),
+              Get.to(() => SelectAreaScreen(service: widget.service),
                   transition: Transition.rightToLeftWithFade,
                   duration: const Duration(milliseconds: 500));
             },
@@ -402,5 +393,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ],
       ),
     );
+  }
+
+  // Helper method to calculate minimum price
+  double _calculateStartingPrice(List<SubService> subServices) {
+    if (subServices.isEmpty) return 250.00; // Default price
+    double minPrice = double.infinity;
+    for (var subService in subServices) {
+      for (var option in subService.options) {
+        if (option.price < minPrice) {
+          minPrice = option.price;
+        }
+      }
+    }
+    return minPrice != double.infinity ? minPrice : 250.00;
   }
 }

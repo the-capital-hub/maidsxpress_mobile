@@ -5,23 +5,48 @@ import 'package:maidxpress/utils/constant/app_var.dart';
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/dropdownWidget/drop_down_widget.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
-
+import '../../controller/service/service_controller.dart';
+import '../../models/service_model.dart';
 import '../../widget/buttons/button.dart';
 import '../pickupAndTimeScreen/pickup_and_time_Screen.dart';
 
 class SelectAreaScreen extends StatefulWidget {
-  const SelectAreaScreen({super.key});
+  final Service service; // Receive selected service
+
+  const SelectAreaScreen({super.key, required this.service});
 
   @override
   State<SelectAreaScreen> createState() => _SelectAreaScreenState();
 }
 
 class _SelectAreaScreenState extends State<SelectAreaScreen> {
+  // Map to store selected options for each subService (key: subService.key, value: option.value)
+  final Map<String, String> selectedOptions = {};
+  // Map to store selected labels for dropdowns (key: subService.key, value: option.label)
+  final Map<String, String> selectedLabels = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize selected options and labels with the first option for each subService
+    for (var subService in widget.service.subServices) {
+      if (subService.options.isNotEmpty) {
+        selectedOptions[subService.key] = subService.options.first.value;
+        selectedLabels[subService.key] = subService.options.first.label;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final ServicesController controller = Get.find<ServicesController>();
+
     return Scaffold(
       backgroundColor: AppColors.white,
-      appBar: HelperAppBar.appbarHelper(title: "Clean Xpress"),
+      appBar: HelperAppBar.appbarHelper(
+          title: widget.service.name.isNotEmpty
+              ? widget.service.name
+              : "Clean Xpress"),
       body: Padding(
         padding: const EdgeInsets.all(12.0),
         child: SingleChildScrollView(
@@ -33,56 +58,50 @@ class _SelectAreaScreenState extends State<SelectAreaScreen> {
                 textSize: 12,
                 fontWeight: FontWeight.w500,
               ),
-              sizedTextfield,
-              DropDownWidget(
-                  hintText: "Select Room",
-                  value: "1 RK",
-                  statusList: const ["1 RK", "1 BHK", "2 BHK", "3 BHK"],
-                  lable:
-                      "Brooming&Mopping : Comprehensive floor cleaning and sanitization (optional)",
-                  onChanged: (v) {}),
-              sizedTextfield,
-              DropDownWidget(
-                  hintText: "Select Person",
-                  value: "1 Person",
-                  statusList: const [
-                    "1 Person",
-                    "2 Person",
-                    "3 Person",
-                    "4 Person",
-                    "5 Perswon"
+              const SizedBox(height: 12),
+              // Dynamically generate dropdowns for each subService
+              ...widget.service.subServices.map((subService) {
+                // Ensure unique labels to avoid duplicates
+                final uniqueLabels = subService.options
+                    .map((option) => option.label)
+                    .toSet()
+                    .toList();
+                if (uniqueLabels.isEmpty) {
+                  return const SizedBox.shrink(); // Skip if no options
+                }
+                return Column(
+                  children: [
+                    DropDownWidget(
+                      hintText: "Select ${subService.name.split(':').first}",
+                      value:
+                          selectedLabels[subService.key] ?? uniqueLabels.first,
+                      statusList: uniqueLabels,
+                      label: subService.name,
+                      onChanged: (value) {
+                        setState(() {
+                          // Find the selected option based on label
+                          final selectedOption = subService.options.firstWhere(
+                            (option) => option.label == value,
+                            orElse: () => subService.options.first,
+                          );
+                          selectedOptions[subService.key] =
+                              selectedOption.value;
+                          selectedLabels[subService.key] = selectedOption.label;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                  lable: "Dish Washing (optional)",
-                  onChanged: (v) {}),
-              sizedTextfield,
-              DropDownWidget(
-                  hintText: "Select Bathroom",
-                  value: "1 Bathroom",
-                  statusList: const [
-                    "1 Bathroom",
-                    "2 Bathroom",
-                    "3 Bathroom",
-                    "4 Bathroom",
-                    "5 Bathroom"
-                  ],
-                  lable: "Bathroom Cleaning (optional)",
-                  onChanged: (v) {}),
-              sizedTextfield,
-              DropDownWidget(
-                  hintText: "Select Room",
-                  value: "1 RK",
-                  statusList: const ["1 RK", "1 BHK", "2 BHK", "3 BHK"],
-                  lable: "Dusting (optional)",
-                  onChanged: (v) {}),
-              sizedTextfield,
-              DropDownWidget(
-                  hintText: "Select Service",
-                  value: "Holding",
-                  statusList: const ["Holding", "Folding", "Holding & Folding"],
-                  lable: "Clothes organization: hanging and folding (optional)",
-                  onChanged: (v) {}),
-              sizedTextfield,
-             
+                );
+              }).toList(),
+              // Fallback message if no subServices
+              if (widget.service.subServices.isEmpty)
+                const TextWidget(
+                  text: "No services available for selection.",
+                  textSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.grey,
+                ),
             ],
           ),
         ),
@@ -90,10 +109,15 @@ class _SelectAreaScreenState extends State<SelectAreaScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: AppButton.primaryButton(
-            onButtonPressed: () {
-              Get.to(() => const PickupAndTimeScreen());
-            },
-            title: "Book Now"),
+          onButtonPressed: () {
+            // Pass selected service and options to PickupAndTimeScreen
+            Get.to(() => PickupAndTimeScreen(
+                // service: widget.service,
+                // selectedOptions: selectedOptions,
+                ));
+          },
+          title: "Book Now",
+        ),
       ),
     );
   }
