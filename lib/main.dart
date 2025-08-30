@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:maidxpress/controller/service/service_controller.dart';
-
-import 'controller/auth/auth_controller.dart';
-import 'screen/authScreen/loginScreen/login_screen.dart';
-import 'screen/homeScreen/home_screen.dart';
-import 'screen/landingScreen/landing_screen.dart';
-
-import 'screen/onboardingScreen/onboarding_screens.dart';
+import 'package:maidxpress/bindings/app_bindings.dart';
+import 'package:maidxpress/controller/auth/auth_controller.dart';
+import 'package:maidxpress/services/auth_service.dart';
+import 'package:maidxpress/screen/authScreen/loginScreen/login_screen.dart';
+import 'package:maidxpress/screen/homeScreen/home_screen.dart';
+import 'package:maidxpress/screen/landingScreen/landing_screen.dart';
+import 'package:maidxpress/screen/onboardingScreen/onboarding_screens.dart';
 
 void main() async {
   // Initialize Flutter bindings
@@ -17,9 +16,12 @@ void main() async {
   // Initialize storage
   await GetStorage.init();
 
-  // Initialize controllers
-  Get.put(AuthController());
-  Get.put(ServicesController());
+  // Initialize services and bindings
+  Get.put(AuthService(), permanent: true);
+  Get.put(AuthController(), permanent: true);
+
+  // Initialize all bindings
+  AppBindings().dependencies();
 
   // Check if it's first time
   final isFirstTime = GetStorage().read('isFirstTime') ?? true;

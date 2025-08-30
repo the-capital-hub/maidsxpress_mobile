@@ -19,6 +19,21 @@ class ApiConstants {
   static const String getServices = '/services/getServices';
   static String getServiceById(String serviceId) =>
       '/services/getServiceById/$serviceId';
+
+  // ================== Address Endpoints ==================
+  static const String addAddress = '/user/addAddress';
+  static const String getAddress = '/user/getAddress';
+  static const String updateAddress = '/user/updateAddress';
+  static const String deleteAddress = '/user/deleteAddress';
+
+  // ================== Booking Endpoints ==================
+  static const String acceptTerms = '/booking/acceptTerms';
+  static String cancelBooking(String bookingId) =>
+      '/booking/cancelBooking/$bookingId';
+  static const String createBooking = '/booking/createBooking';
+  static String getBookingById(String bookingId) =>
+      '/booking/getBookingById/$bookingId';
+  static const String getBookings = '/booking/getBookings';
 }
 
 class AppConstants {

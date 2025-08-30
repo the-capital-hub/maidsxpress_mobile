@@ -1,17 +1,25 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
+import 'package:maidxpress/screen/addressScreen/address_selection_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/utils/constant/app_var.dart';
-import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/text_field/text_field.dart';
+import '../../models/service_model.dart';
 
 import '../../widget/buttons/button.dart';
 import '../../widget/textwidget/text_widget.dart';
-import '../addressScreen/address_screen.dart';
 
 class PickupAndTimeScreen extends StatefulWidget {
-  const PickupAndTimeScreen({super.key});
+  final dynamic service;
+  final Map<String, String> selectedOptions;
+
+  const PickupAndTimeScreen({
+    super.key,
+    required this.service,
+    required this.selectedOptions,
+  });
 
   @override
   State<PickupAndTimeScreen> createState() => _PickupAndTimeScreenState();
@@ -42,6 +50,75 @@ class _PickupAndTimeScreenState extends State<PickupAndTimeScreen> {
   ];
 
   final List<String> genders = ["Male", "Female"];
+
+  // Calculate total price based on selected options
+  double _calculateTotalPrice() {
+    try {
+      double total = 0.0;
+
+      // Debug print to check service structure
+      print('Service type: ${widget.service.runtimeType}');
+
+      // If service is already a Service object
+      if (widget.service is Service) {
+        final service = widget.service as Service;
+        for (final subService in service.subServices) {
+          final selectedValue = widget.selectedOptions[subService.key];
+          if (selectedValue != null && selectedValue.isNotEmpty) {
+            try {
+              // Find the selected option
+              final option = subService.options.firstWhere(
+                (opt) => opt.value == selectedValue,
+                orElse: () => ServiceOption(
+                  label: 'Default',
+                  value: selectedValue,
+                  price: 0.0,
+                ),
+              );
+              total += option.price;
+              print('Added ${option.price} for ${subService.name}');
+            } catch (e) {
+              print('Error processing option $selectedValue: $e');
+            }
+          }
+        }
+      }
+      // If service is a Map (from JSON)
+      else if (widget.service is Map<String, dynamic>) {
+        final service = widget.service;
+        final subServices =
+            List<Map<String, dynamic>>.from(service['subServices'] ?? []);
+
+        for (final entry in widget.selectedOptions.entries) {
+          if (entry.value.isEmpty) continue;
+
+          // Find the sub-service
+          final subService = subServices.firstWhere(
+            (s) => s['key'] == entry.key,
+            orElse: () => <String, dynamic>{},
+          );
+
+          if (subService.isNotEmpty) {
+            final options =
+                List<Map<String, dynamic>>.from(subService['options'] ?? []);
+            if (options.isNotEmpty) {
+              final selectedOption = options.firstWhere(
+                (o) => o['value'] == entry.value,
+                orElse: () => <String, dynamic>{'price': 0.0},
+              );
+              final price = (selectedOption['price'] ?? 0.0).toDouble();
+              total += price;
+              print('Added $price for ${entry.key}: ${entry.value}');
+            }
+          }
+        }
+      }
+
+      return total > 0 ? total : 0.0;
+    } catch (e) {
+      return 0.0;
+    }
+  }
 
   @override
   void initState() {
@@ -93,6 +170,8 @@ class _PickupAndTimeScreenState extends State<PickupAndTimeScreen> {
                   height: 260,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  color: Colors.black54.withOpacity(0.5),
+                  colorBlendMode: BlendMode.darken,
                 ),
               ),
               Positioned(
@@ -111,24 +190,67 @@ class _PickupAndTimeScreenState extends State<PickupAndTimeScreen> {
                   ),
                 ),
               ),
-              const Positioned(
+              Positioned(
                 bottom: 20,
                 left: 16,
+                right: 16,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextWidget(
-                      text: "House Full Cleaning",
-                      textSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    // Service name
+                    Text(
+                      widget.service.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: 4),
-                    TextWidget(
-                      text: "Electronic City Phase 1, Doddathogur Cross...",
-                      textSize: 14,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.white,
+                    const SizedBox(height: 4),
+                    // Selected options summary
+                    if (widget.selectedOptions.isNotEmpty) ...[
+                      Text(
+                        widget.service.subServices
+                            .where((subService) => widget.selectedOptions
+                                .containsKey(subService.key))
+                            .map((subService) {
+                          ServiceOption option;
+                          try {
+                            option = subService.options.firstWhere(
+                              (opt) =>
+                                  opt.value ==
+                                  widget.selectedOptions[subService.key],
+                            );
+                          } catch (e) {
+                            option = subService.options.isNotEmpty
+                                ? subService.options.first
+                                : ServiceOption(
+                                    label: 'N/A',
+                                    value: 'na',
+                                    price: 0.0,
+                                  );
+                          }
+                          return '${subService.name.split(':').first.trim()}: ${option.label}';
+                        }).join(', '),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    // Total price
+                    Text(
+                      'Total: ₹${_calculateTotalPrice().toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ],
                 ),
@@ -304,13 +426,78 @@ class _PickupAndTimeScreenState extends State<PickupAndTimeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: AppButton.primaryButton(
-            onButtonPressed: () {
-              Get.to(() => const AddressSelectionScreen());
-            },
-            title: "Continue - ₹2,085.00"),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextWidget(
+                    text: 'Total Amount',
+                    textSize: 12,
+                    color: AppColors.black54,
+                  ),
+                  const SizedBox(height: 2),
+                  TextWidget(
+                    text: '₹${_calculateTotalPrice().toStringAsFixed(2)}',
+                    textSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 2,
+              child: AppButton.primaryButton(
+                onButtonPressed: () {
+                  // Get the selected date and time
+                  final selectedDate = fullDates.isNotEmpty
+                      ? fullDates[selectedDateIndex]
+                      : DateTime.now();
+                  final selectedTime = times[selectedTimeIndex];
+                  final totalPrice = _calculateTotalPrice();
+
+                  // Print debug info before navigation
+                  print('Passing to address screen:');
+                  print('Selected Date: $selectedDate');
+                  print('Selected Time: $selectedTime');
+                  print('Total Price: $totalPrice');
+                  print('Selected Options: ${widget.selectedOptions}');
+
+                  // Navigate to AddressSelectionScreen with all required parameters
+                  Get.to(
+                    () => const AddressSelectionScreen(),
+                    arguments: {
+                      'service': widget.service,
+                      'selectedOptions': widget.selectedOptions,
+                      'selectedDate': selectedDate,
+                      'selectedTime': selectedTime,
+                      'totalPrice': totalPrice,
+                    },
+                  );
+                },
+                title: 'Continue',
+                height: 48,
+                borderRadius: 10,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

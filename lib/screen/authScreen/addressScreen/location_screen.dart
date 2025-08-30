@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:maidxpress/screen/landingScreen/landing_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
-import 'package:maidxpress/utils/constant/app_var.dart';
+
 import 'package:maidxpress/utils/constant/asset_constant.dart';
-import 'package:maidxpress/widget/appbar/appbar.dart';
+
 import 'package:maidxpress/widget/buttons/button.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
 

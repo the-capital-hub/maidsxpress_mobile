@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:dio/dio.dart';
 
 import '../../../models/user_model.dart';
+import '../../../services/auth_service.dart';
 import '../../../utils/constant/const_data.dart';
 
 class AuthController extends GetxController {
@@ -12,7 +13,7 @@ class AuthController extends GetxController {
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = false.obs;
   final _dio = Dio(BaseOptions(baseUrl: ApiConstants.baseUrl));
-  final _storage = GetStorage();
+  final _authService = AuthService();
 
   @override
   void onInit() {
@@ -22,23 +23,23 @@ class AuthController extends GetxController {
 
   // Load user data from storage
   Future<void> _loadUserData() async {
-    final userData = _storage.read(AppConstants.userDataKey);
-    if (userData != null) {
-      user.value = UserModel.fromJson(userData);
+    user.value = _authService.currentUser;
+    if (user.value != null) {
       _dio.options.headers['Authorization'] = 'Bearer ${user.value!.token}';
     }
   }
 
   // Save user data to storage
   Future<void> _saveUserData(UserModel userData) async {
-    await _storage.write(AppConstants.userDataKey, userData.toJson());
+    await _authService.saveUserData(userData);
+    user.value = userData;
     _dio.options.headers['Authorization'] = 'Bearer ${userData.token}';
   }
 
   // Clear user data from storage
   Future<void> _clearUserData() async {
-    await _storage.remove('token');
-    await _storage.remove('userData');
+    await _authService.clearUserData();
+    user.value = null;
     _dio.options.headers.remove('Authorization');
   }
 
@@ -58,20 +59,17 @@ class AuthController extends GetxController {
   }
 
   // Send OTP for login
-  Future<bool> sendLoginOtp({String? email, String? phone}) async {
+  Future<bool> sendLoginOtp({required String phoneOrEmail}) async {
     try {
-      if ((email == null || email.isEmpty) && (phone == null || phone.isEmpty)) {
+      if (phoneOrEmail.isEmpty) {
         Get.snackbar('Error', 'Please enter email or phone number');
         return false;
       }
 
       isLoading.value = true;
       final data = {};
-      if (email != null && email.isNotEmpty) {
-        data['email'] = email;
-      }
-      if (phone != null && phone.isNotEmpty) {
-        data['phone'] = phone;
+      if (phoneOrEmail.isNotEmpty) {
+        data['phoneOrEmail'] = phoneOrEmail;
       }
 
       final response = await _dio.post(
@@ -90,27 +88,35 @@ class AuthController extends GetxController {
   }
 
   // Verify OTP for login
-  Future<bool> verifyLoginOtp({required String otp, String? email, String? phone}) async {
+  Future<bool> verifyLoginOtp({
+    required String otp,
+    required String phoneOrEmail,
+  }) async {
     try {
       isLoading.value = true;
-      final data = {
-        'otp': otp,
-        if (email != null && email.isNotEmpty) 'email': email,
-        if (phone != null && phone.isNotEmpty) 'phone': phone,
-      };
-
+      final data = {'otp': otp, 'phoneOrEmail': phoneOrEmail};
       final response = await _dio.post(
         ApiConstants.verifyLoginOtp,
         data: data,
       );
 
       debugPrint('Verify OTP Response: ${response.data}');
-      
+
       if (response.statusCode == 200) {
         final userData = UserModel.fromJson(response.data['data']);
+        if (userData.token == null || userData.token!.isEmpty) {
+          throw Exception('No token received from server');
+        }
+        // Save user data and token to local storage
         await _saveUserData(userData);
-        // Save token to storage for auto-login
-        await _storage.write('token', userData.token);
+        final storage = GetStorage();
+        await storage.write('token', userData.token);
+        await storage.write('user', userData.toJson());
+        
+        // Update auth state
+        user.value = userData;
+        _dio.options.headers['Authorization'] = 'Bearer ${userData.token}';
+        
         return true;
       }
       return false;
@@ -123,12 +129,12 @@ class AuthController extends GetxController {
   }
 
   // Send OTP for registration
-  Future<bool> sendRegisterOtp({required String email}) async {
+  Future<bool> sendRegisterOtp({required String phoneOrEmail}) async {
     try {
       isLoading.value = true;
       final response = await _dio.post(
         ApiConstants.registerSendOtp,
-        data: {'email': email},
+        data: {'phoneOrEmail': phoneOrEmail},
       );
 
       debugPrint('Register OTP Response: ${response.data}');
@@ -144,13 +150,13 @@ class AuthController extends GetxController {
   // Verify OTP for registration
   Future<bool> verifyRegisterOtp({
     required String otp,
-    required String email,
+    required String phoneOrEmail,
   }) async {
     try {
       isLoading.value = true;
       final response = await _dio.post(
         ApiConstants.registerVerifyOtp,
-        data: {'otp': otp, 'email': email},
+        data: {'otp': otp, 'phoneOrEmail': phoneOrEmail},
       );
 
       if (response.statusCode == 200) {

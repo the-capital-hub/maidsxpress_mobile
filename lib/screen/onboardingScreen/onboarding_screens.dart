@@ -2,6 +2,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:maidxpress/screen/landingScreen/landing_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/utils/constant/asset_constant.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
@@ -31,11 +32,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _checkAuthStatus() {
     final token = _storage.read('token');
-    if (token != null && token.toString().isNotEmpty) {
+    if (token == null || token.toString().isEmpty) {
+      // No valid token, redirect to login
+      debugPrint('No valid authentication token found');
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Get.offAll(() => const HomeScreen());
+        if (mounted) {
+          Get.offAll(() => const LoginScreen());
+        }
       });
+      return;
     }
+
+    // Valid token found, navigate to home
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Get.offAll(() => const LandingScreen());
+      }
+    });
   }
 
   final List<Map<String, String>> onboardingData = [

@@ -1,11 +1,28 @@
 import 'package:dio/dio.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import 'package:maidxpress/utils/constant/const_data.dart';
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   late final Dio _dio;
-  final String baseUrl =
-      'https://maidsxpress.com/api'; // Replace with your API base URL
+  final String baseUrl = ApiConstants.baseUrl;
+  final GetStorage _storage = GetStorage();
+
+  // Token storage key
+  static const String _tokenKey = 'auth_token';
+
+  // Get token from storage
+  String? get token => _storage.read(_tokenKey);
+
+  // Set token to storage
+  set token(String? value) {
+    if (value != null) {
+      _storage.write(_tokenKey, value);
+    } else {
+      _storage.remove(_tokenKey);
+    }
+  }
 
   factory ApiClient() {
     return _instance;
@@ -34,6 +51,28 @@ class ApiClient {
     );
   }
 
+  // Add auth headers to request
+  Map<String, String> _getAuthHeaders(
+      [Map<String, String>? additionalHeaders]) {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    // Add token if available
+    final authToken = token;
+    if (authToken != null) {
+      headers['Authorization'] = 'Bearer $authToken';
+    }
+
+    // Add any additional headers
+    if (additionalHeaders != null) {
+      headers.addAll(additionalHeaders);
+    }
+
+    return headers;
+  }
+
   // GET request
   Future<Response> get(
     String path, {
@@ -44,7 +83,8 @@ class ApiClient {
       final response = await _dio.get(
         path,
         queryParameters: queryParameters,
-        options: Options(headers: headers),
+        options:
+            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -58,13 +98,15 @@ class ApiClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Map<String, dynamic>? headers,
+    Options? options,
   }) async {
     try {
       final response = await _dio.post(
         path,
         data: data,
         queryParameters: queryParameters,
-        options: Options(headers: headers),
+        options: options ??
+            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -84,7 +126,8 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: Options(headers: headers),
+        options:
+            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -104,7 +147,8 @@ class ApiClient {
         path,
         data: data,
         queryParameters: queryParameters,
-        options: Options(headers: headers),
+        options:
+            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {

@@ -11,6 +11,7 @@ import 'package:maidxpress/widget/text_field/text_field.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
 
 import '../../../controller/auth/auth_controller.dart';
+import '../../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,9 +24,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController loginController = TextEditingController();
   final RxBool isLoading = false.obs;
 
+  final dynamic args = Get.arguments;
+  String? returnRoute;
+  dynamic routeArgs;
+
   @override
   void initState() {
     super.initState();
+    // Extract return route from arguments if provided
+    if (args is Map<String, dynamic>) {
+      returnRoute = (args['returnRoute'] as String?)?.toString();
+      routeArgs = args['args'];
+    }
+
     // Check if user is already logged in
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkLoginStatus();
@@ -33,9 +44,53 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _checkLoginStatus() async {
-    final token = await GetStorage().read('token');
-    if (token != null && token.toString().isNotEmpty) {
-      Get.offAllNamed('/home');
+    final isLoggedIn = await authService.isLoggedIn;
+    if (isLoggedIn) {
+      await _handlePendingBooking();
+      _redirectAfterLogin();
+    }
+  }
+
+  Future<void> _handlePendingBooking() async {
+    final prefs = GetStorage();
+    final pendingBooking = await prefs.read('pending_booking');
+
+    if (pendingBooking != null && pendingBooking is Map) {
+      // Clear the pending booking
+      await prefs.remove('pending_booking');
+
+      // Navigate back to the order summary screen with the stored data
+      if (pendingBooking['route'] != null) {
+        final returnRoute = pendingBooking['route'] as String;
+        final args = pendingBooking['args'];
+        
+        if (returnRoute.isNotEmpty) {
+          // Use the stored route and args to navigate back
+          Get.offAllNamed(
+            returnRoute,
+            arguments: args,
+          );
+        } else {
+          // Fallback to home if no route is specified
+          Get.offAllNamed('/home');
+        }
+        //     'selectedOptions': selectedOptions,
+        //     'selectedDate': selectedDate,
+        //     'selectedTime': selectedTime,
+        //     'addressId': addressId,
+        //   },
+        // );
+      }
+    }
+  }
+
+  void _redirectAfterLogin() {
+    if (returnRoute != null) {
+      // If we have a return route, navigate back to it with the original arguments
+      Get.offAllNamed(returnRoute!, arguments: routeArgs);
+    } else {
+      // Otherwise, go to the default landing page
+      Get.offAllNamed('/landing');
     }
   }
 
@@ -72,8 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       isLoading.value = true;
       final success = await AuthController.to.sendLoginOtp(
-        email: isEmail ? input : null,
-        phone: isPhone ? input : null,
+        phoneOrEmail: input,
       );
 
       if (success) {
@@ -84,10 +138,13 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: Colors.green,
           colorText: Colors.white,
         );
-        Get.to(() => OtpScreen(
-              email: isEmail ? input : null,
-              phone: isPhone ? input : null,
-            ));
+        Get.to(
+          () => OtpScreen(
+            email: isEmail ? input : null,
+            phone: isPhone ? input : null,
+            onVerificationSuccess: _redirectAfterLogin,
+          ),
+        );
       }
     } catch (e) {
       Get.snackbar(

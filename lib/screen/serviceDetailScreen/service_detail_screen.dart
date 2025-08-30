@@ -1,10 +1,12 @@
+// ignore_for_file: prefer_const_constructors
+
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:maidxpress/screen/selectAreaScreen/select_area_screen.dart';
 import 'package:maidxpress/screen/serviceDetailScreen/reviewWidget/review_widget_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
-import 'package:maidxpress/utils/constant/app_var.dart';
+
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
 import '../../models/service_model.dart';
@@ -49,7 +51,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             : 'https://via.placeholder.com/300',
                         height: 180,
                         width: double.infinity,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.fitHeight,
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 180,
                           color: Colors.grey[300],
@@ -171,7 +173,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         child: buildBullet(
                           icon: Icons.check_circle,
                           iconColor: AppColors.green700,
-                          title: item.displayTitle,
                           desc: item.description.isNotEmpty
                               ? item.description
                               : "No details",
@@ -202,7 +203,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         child: buildBullet(
                           icon: Icons.cancel,
                           iconColor: AppColors.redColor,
-                          title: item.displayTitle,
                           desc: item.description.isNotEmpty
                               ? item.description
                               : "No details",
@@ -357,7 +357,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   Widget buildBullet({
     required IconData icon,
     required Color iconColor,
-    required String title,
     required String desc,
   }) {
     return Padding(
@@ -372,7 +371,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               text: TextSpan(
                 children: [
                   TextSpan(
-                    text: "$title – ",
+                    text: " – ",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,

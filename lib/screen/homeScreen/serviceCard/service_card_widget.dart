@@ -16,16 +16,15 @@ class ServiceCardWidget extends StatelessWidget {
     if (service.id.isEmpty) {
       return const SizedBox.shrink(); // Return empty widget if no data
     }
-      // Calculate minimum price across all subServices
-      final startingPrice = _calculateStartingPrice(service.subServices);
-      // Get first non-empty description from include
-      final description = service.include
-          .firstWhere(
-            (item) => item.description.isNotEmpty,
-            orElse: () => ServiceDetail(
-                title: "", description: "No description available"),
-          )
-          .description;
+    // Calculate minimum price across all subServices
+    final startingPrice = _calculateStartingPrice(service.subServices);
+    // Get first non-empty description from include
+    final description = service.include
+        .firstWhere(
+          (item) => item.description.isNotEmpty,
+          orElse: () => ServiceDetail(description: "No description available"),
+        )
+        .description;
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -33,108 +32,108 @@ class ServiceCardWidget extends StatelessWidget {
       color: AppColors.white,
       margin: const EdgeInsets.only(bottom: 20),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(10)),
-                  child: Image.network(
-                    service.image.isNotEmpty
-                        ? service.image
-                        : 'https://via.placeholder.com/300',
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(10)),
+                child: Image.network(
+                  service.image.isNotEmpty
+                      ? service.image
+                      : 'https://via.placeholder.com/300',
+                  height: 180,
+                  width: double.maxFinite,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
                     height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 180,
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: Icon(Icons.broken_image,
-                            size: 50, color: Colors.grey),
-                      ),
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.broken_image,
+                          size: 50, color: Colors.grey),
                     ),
                   ),
                 ),
-                const Positioned(
-                  top: 12,
-                  right: 12,
-                  child: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      Icons.favorite_border,
-                      size: 16,
-                      color: Colors.red,
-                    ),
+              ),
+              const Positioned(
+                top: 12,
+                right: 12,
+                child: CircleAvatar(
+                  radius: 14,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.favorite_border,
+                    size: 16,
+                    color: Colors.red,
                   ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  text: service.name.isNotEmpty
+                      ? service.name
+                      : "Unnamed Service",
+                  textSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+                const SizedBox(height: 4),
+                TextWidget(
+                  textSize: 14,
+                  text: description,
+                  maxLine: 2,
+                  color: AppColors.black54,
+                  fontWeight: FontWeight.w500,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    TextWidget(
+                      text: "Starting Price ",
+                      color: AppColors.grey700,
+                      fontWeight: FontWeight.w500,
+                      textSize: 13,
+                    ),
+                    TextWidget(
+                      text: "₹${startingPrice.toStringAsFixed(2)}",
+                      fontWeight: FontWeight.bold,
+                      textSize: 14,
+                    ),
+                    const Icon(Icons.star, size: 16, color: Colors.amber),
+                    const TextWidget(
+                      text: " 4.4 ", // Static, update if rating is in model
+                      fontWeight: FontWeight.w500,
+                      textSize: 14,
+                    ),
+                    const TextWidget(
+                      text:
+                          "(120 Users)", // Static, update if user count is in model
+                      textSize: 14,
+                      color: AppColors.black54,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                AppButton.primaryButton(
+                  onButtonPressed: () {
+                    Get.to(() => ServiceDetailScreen(service: service));
+                  },
+                  width: 100,
+                  height: 35,
+                  fontSize: 13,
+                  title: "Book Now",
                 ),
               ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextWidget(
-                    text: service.name.isNotEmpty
-                        ? service.name
-                        : "Unnamed Service",
-                    textSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  const SizedBox(height: 4),
-                  TextWidget(
-                    textSize: 14,
-                    text: description,
-                    maxLine: 2,
-                    color: AppColors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      TextWidget(
-                        text: "Starting Price ",
-                        color: AppColors.grey700,
-                        fontWeight: FontWeight.w500,
-                        textSize: 13,
-                      ),
-                      TextWidget(
-                        text: "₹${startingPrice.toStringAsFixed(2)}",
-                        fontWeight: FontWeight.bold,
-                        textSize: 14,
-                      ),
-                      const Icon(Icons.star, size: 16, color: Colors.amber),
-                      const TextWidget(
-                        text: " 4.4 ", // Static, update if rating is in model
-                        fontWeight: FontWeight.w500,
-                        textSize: 14,
-                      ),
-                      const TextWidget(
-                        text:
-                            "(120 Users)", // Static, update if user count is in model
-                        textSize: 14,
-                        color: AppColors.black54,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  AppButton.primaryButton(
-                    onButtonPressed: () {
-                      Get.to(() => ServiceDetailScreen(service: service));
-                    },
-                    width: 100,
-                    height: 35,
-                    fontSize: 13,
-                    title: "Book Now",
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 

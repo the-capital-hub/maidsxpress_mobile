@@ -59,26 +59,47 @@ class Service {
       isFavorite: json['isFavorite'] ?? false,
     );
   }
+
+  Service copyWith({
+    String? id,
+    String? name,
+    String? tag,
+    String? image,
+    List<ServiceDetail>? include,
+    List<ServiceDetail>? exclude,
+    List<SubService>? subServices,
+    bool? isFavorite,
+  }) {
+    return Service(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      tag: tag ?? this.tag,
+      image: image ?? this.image,
+      include: include ?? List<ServiceDetail>.from(this.include),
+      exclude: exclude ?? List<ServiceDetail>.from(this.exclude),
+      subServices: subServices ?? List<SubService>.from(this.subServices),
+      isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
 }
 
 class ServiceDetail {
-  final String title;
   final String description;
 
   ServiceDetail({
-    required this.title,
     required this.description,
   });
 
-  // Getter to handle empty or whitespace titles
-  String get displayTitle =>
-      title.trim().isNotEmpty ? title.trim() : 'Untitled';
-
   factory ServiceDetail.fromJson(Map<String, dynamic> json) {
     return ServiceDetail(
-      title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'description': description,
+    };
   }
 }
 
@@ -86,12 +107,32 @@ class SubService {
   final String key;
   final String name;
   final List<ServiceOption> options;
+  final ServiceOption? selectedOption;
+  final bool isSelected;
 
   SubService({
     required this.key,
     required this.name,
     required this.options,
+    this.selectedOption,
+    this.isSelected = false,
   });
+
+  SubService copyWith({
+    String? key,
+    String? name,
+    List<ServiceOption>? options,
+    ServiceOption? selectedOption,
+    bool? isSelected,
+  }) {
+    return SubService(
+      key: key ?? this.key,
+      name: name ?? this.name,
+      options: options ?? this.options,
+      selectedOption: selectedOption ?? this.selectedOption,
+      isSelected: isSelected ?? this.isSelected,
+    );
+  }
 
   factory SubService.fromJson(Map<String, dynamic> json) {
     return SubService(
@@ -102,6 +143,15 @@ class SubService {
               json['options'].map((x) => ServiceOption.fromJson(x)))
           : [],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      'name': name,
+      'options': options.map((x) => x.toJson()).toList(),
+      'isSelected': isSelected,
+    };
   }
 }
 
@@ -125,5 +175,13 @@ class ServiceOption {
               : json['price']?.toDouble()) ??
           0.0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'label': label,
+      'value': value,
+      'price': price,
+    };
   }
 }

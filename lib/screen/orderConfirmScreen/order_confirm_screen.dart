@@ -8,7 +8,9 @@ import 'package:maidxpress/widget/buttons/button.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
 
 class OrderConfirmScreen extends StatefulWidget {
-  const OrderConfirmScreen({super.key});
+  final dynamic booking; // Or use your specific booking model type
+  
+  const OrderConfirmScreen({super.key, required this.booking});
 
   @override
   State<OrderConfirmScreen> createState() => _OrderConfirmScreenState();

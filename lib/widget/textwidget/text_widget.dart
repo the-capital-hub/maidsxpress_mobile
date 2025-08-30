@@ -16,6 +16,8 @@ class TextWidget extends StatelessWidget {
   final TextStyle? googleStyle;
   final TextDecoration? textDecoration;
   final bool? googleFont;
+  final TextOverflow? overflow;
+  final int? maxLines;
 
   final TextSpan? textSpan;
   const TextWidget({
@@ -30,6 +32,8 @@ class TextWidget extends StatelessWidget {
     this.googleStyle,
     this.textSpan,
     this.textDecoration,
+    this.overflow,
+    this.maxLines,
   }) : super(key: key);
 
   @override
@@ -44,7 +48,7 @@ class TextWidget extends StatelessWidget {
                 decoration: textDecoration,
                 fontWeight: fontWeight ?? FontWeight.normal,
                 color: color ?? AppColors.black,
-              ))  
+              ))
             : googleStyle ??
                 Theme.of(context).textTheme.displayLarge!.copyWith(
                       decoration: textDecoration,

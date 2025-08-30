@@ -14,8 +14,14 @@ import '../../../utils/constant/asset_constant.dart';
 class OtpScreen extends StatefulWidget {
   final String? phone;
   final String? email;
+  final VoidCallback? onVerificationSuccess;
 
-  const OtpScreen({super.key, this.phone, this.email});
+  const OtpScreen({
+    super.key,
+    this.phone,
+    this.email,
+    this.onVerificationSuccess,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -57,15 +63,31 @@ class _OtpScreenState extends State<OtpScreen> {
 
     try {
       isLoading.value = true;
+      // Use either phone or email for verification
+      final phoneOrEmail = widget.phone ?? widget.email;
+      if (phoneOrEmail == null) {
+        Get.snackbar(
+          'Error',
+          'Phone or email is required for verification',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+
       final success = await AuthController.to.verifyLoginOtp(
         otp: otp,
-        email: widget.email,
-        phone: widget.phone,
+        phoneOrEmail: phoneOrEmail,
       );
 
       if (success) {
-        // Navigate to home screen after successful verification
-        Get.offAllNamed('/landing');
+        // Call the success callback if provided, otherwise go to landing
+        if (widget.onVerificationSuccess != null) {
+          widget.onVerificationSuccess!();
+        } else {
+          Get.offAllNamed('/landing');
+        }
       } else {
         Get.snackbar(
           'Error',
@@ -151,10 +173,10 @@ class _OtpScreenState extends State<OtpScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(12),
         child: Obx(() => AppButton.primaryButton(
-          onButtonPressed: _verifyOtp,
-          title: "Verify",
-          isLoading: isLoading.value,
-        )),
+              onButtonPressed: _verifyOtp,
+              title: "Verify",
+              isLoading: isLoading.value,
+            )),
       ),
     );
   }
