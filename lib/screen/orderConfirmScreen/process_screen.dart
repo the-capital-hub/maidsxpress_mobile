@@ -14,7 +14,7 @@ class ProcessScreen extends StatefulWidget {
 }
 
 class _ProcessScreenState extends State<ProcessScreen> {
-  @override 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.white,

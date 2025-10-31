@@ -31,41 +31,57 @@ class ServiceCardWidget extends StatelessWidget {
       elevation: 2,
       color: AppColors.white,
       margin: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: InkWell(
+        onTap: () {
+          Get.to(() => ServiceDetailScreen(service: service));
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Stack(
             children: [
               ClipRRect(
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(10)),
-                child: Image.network(
-                  service.image.isNotEmpty
-                      ? service.image
-                      : 'https://via.placeholder.com/300',
+                child: Container(
                   height: 180,
                   width: double.maxFinite,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 180,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(Icons.broken_image,
-                          size: 50, color: Colors.grey),
+                  child: FittedBox(
+                    fit: BoxFit
+                        .fitHeight, // Changed to fitHeight to preserve bottom
+                    clipBehavior: Clip.hardEdge,
+                    alignment: Alignment.center, // Center to balance cropping
+                    child: Image.network(
+                      service.image.isNotEmpty
+                          ? service.image
+                          : 'https://via.placeholder.com/300',
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: Icon(Icons.broken_image,
+                              size: 50, color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-              const Positioned(
+              Positioned(
                 top: 12,
                 right: 12,
-                child: CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.favorite_border,
-                    size: 16,
-                    color: Colors.red,
+                child: InkWell(
+                  onTap: () {
+                    // TODO: Add favorite functionality
+                    Get.snackbar('Favorite', 'Feature coming soon!');
+                  },
+                  child: const CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      Icons.favorite_border,
+                      size: 16,
+                      color: Colors.red,
+                    ),
                   ),
                 ),
               ),
@@ -133,6 +149,7 @@ class ServiceCardWidget extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }

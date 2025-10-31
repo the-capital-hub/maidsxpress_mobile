@@ -9,18 +9,33 @@ class ApiClient {
   final String baseUrl = ApiConstants.baseUrl;
   final GetStorage _storage = GetStorage();
 
-  // Token storage key
-  static const String _tokenKey = 'auth_token';
+  // Get token from storage with fallback to 'token' key for compatibility
+  String? get token {
+    // First try the main token key
+    String? authToken = _storage.read('token');
+    if (authToken != null && authToken.isNotEmpty) {
+      return authToken;
+    }
 
-  // Get token from storage
-  String? get token => _storage.read(_tokenKey);
+    // Fallback to auth_token key
+    authToken = _storage.read('auth_token');
+    if (authToken != null && authToken.isNotEmpty) {
+      return authToken;
+    }
 
-  // Set token to storage
+    return null;
+  }
+
+  // Set token to storage and update headers
   set token(String? value) {
-    if (value != null) {
-      _storage.write(_tokenKey, value);
+    if (value != null && value.isNotEmpty) {
+      _storage.write('token', value);
+      _storage.write('auth_token', value); // Keep both for compatibility
+      _dio.options.headers['Authorization'] = 'Bearer $value';
     } else {
-      _storage.remove(_tokenKey);
+      _storage.remove('token');
+      _storage.remove('auth_token');
+      _dio.options.headers.remove('Authorization');
     }
   }
 
@@ -35,8 +50,18 @@ class ApiClient {
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         responseType: ResponseType.json,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
       ),
     );
+
+    // Set initial token if available
+    final initialToken = token;
+    if (initialToken != null) {
+      _dio.options.headers['Authorization'] = 'Bearer $initialToken';
+    }
 
     // Add interceptors
     _dio.interceptors.add(
@@ -49,11 +74,33 @@ class ApiClient {
         compact: true,
       ),
     );
+
+    // Add token refresh interceptor
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          // Always ensure we have the latest token
+          final currentToken = token;
+          if (currentToken != null) {
+            options.headers['Authorization'] = 'Bearer $currentToken';
+          }
+          handler.next(options);
+        },
+        onError: (error, handler) {
+          // Handle 401 errors
+          if (error.response?.statusCode == 401) {
+            // Token might be expired, clear it
+            token = null;
+            // You could also trigger a logout here if needed
+          }
+          handler.next(error);
+        },
+      ),
+    );
   }
 
-  // Add auth headers to request
-  Map<String, String> _getAuthHeaders(
-      [Map<String, String>? additionalHeaders]) {
+  // Get auth headers for requests
+  Map<String, String> getAuthHeaders([Map<String, String>? additionalHeaders]) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -84,7 +131,7 @@ class ApiClient {
         path,
         queryParameters: queryParameters,
         options:
-            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
+            Options(headers: getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -106,7 +153,7 @@ class ApiClient {
         data: data,
         queryParameters: queryParameters,
         options: options ??
-            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
+            Options(headers: getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -127,7 +174,7 @@ class ApiClient {
         data: data,
         queryParameters: queryParameters,
         options:
-            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
+            Options(headers: getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {
@@ -148,7 +195,7 @@ class ApiClient {
         data: data,
         queryParameters: queryParameters,
         options:
-            Options(headers: _getAuthHeaders(headers?.cast<String, String>())),
+            Options(headers: getAuthHeaders(headers?.cast<String, String>())),
       );
       return response;
     } on DioException catch (e) {

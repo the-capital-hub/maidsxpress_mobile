@@ -27,6 +27,22 @@ class _LandingScreenState extends State<LandingScreen> {
     super.initState();
   }
 
+  // Helper method to get responsive icon size
+  double getIconSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 20.0;
+    if (screenWidth < 400) return 22.0;
+    return 24.0;
+  }
+
+  // Helper method to get responsive text size
+  double getTextSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (screenWidth < 360) return 8.0;
+    if (screenWidth < 400) return 9.0;
+    return 10.0;
+  }
+
   List icons = [
     Icons.home,
     Icons.assignment,
@@ -56,71 +72,78 @@ class _LandingScreenState extends State<LandingScreen> {
     return Obx(() => Scaffold(
           backgroundColor: AppColors.white,
           resizeToAvoidBottomInset: false,
-          bottomNavigationBar: Container(
-            padding:
-                const EdgeInsets.only(top: 8, bottom: 8, left: 20, right: 20),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border(
-                  top: BorderSide(color: AppColors.blackBorder, width: 0.5)),
-              borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18), topRight: Radius.circular(18)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x1FFFFFFF),
-                  spreadRadius: 2,
-                  blurRadius: 7,
-                  offset: Offset(0, 2), // changes position of shadow
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(
-                icons.length,
-                (index) => InkWell(
-                  onTap: () {
-                    homeController.selectedIndex.value = index;
-                  },
-                  child: SizedBox(
-                    width: 50,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          homeController.selectedIndex == index
-                              ? icons[index]
-                              : iconsUnselected[index],
-                          size: 24,
-                          color: homeController.selectedIndex == index
-                              ? AppColors.primary
-                              : AppColors.blackCard.withOpacity(0.7),
+          bottomNavigationBar: SafeArea(
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: 60,
+                maxHeight: 80,
+              ),
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: MediaQuery.of(context).padding.bottom > 0 ? 4 : 8,
+                left: MediaQuery.of(context).size.width < 360 ? 12 : 16,
+                right: MediaQuery.of(context).size.width < 360 ? 12 : 16,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border(
+                    top: BorderSide(color: AppColors.blackBorder, width: 0.5)),
+                borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18), topRight: Radius.circular(18)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1FFFFFFF),
+                    spreadRadius: 2,
+                    blurRadius: 7,
+                    offset: Offset(0, 2), // changes position of shadow
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(
+                  icons.length,
+                  (index) => Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        homeController.selectedIndex.value = index;
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              homeController.selectedIndex == index
+                                  ? icons[index]
+                                  : iconsUnselected[index],
+                              size: getIconSize(context),
+                              color: homeController.selectedIndex == index
+                                  ? AppColors.primary
+                                  : AppColors.blackCard.withOpacity(0.7),
+                            ),
+                            const SizedBox(height: 3),
+                            Flexible(
+                              child: TextWidget(
+                                text: title[index],
+                                textSize: getTextSize(context),
+                                color: homeController.selectedIndex == index
+                                    ? AppColors.primary
+                                    : AppColors.blackCard.withOpacity(0.7),
+                                fontWeight: homeController.selectedIndex == index
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                maxLine: 1,
+                                align: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        TextWidget(
-                          text: title[index],
-                          textSize: 10,
-                          color: homeController.selectedIndex == index
-                              ? AppColors.primary
-                              : AppColors.blackCard.withOpacity(0.7),
-                          fontWeight: homeController.selectedIndex == index
-                              ? FontWeight.w500
-                              : FontWeight.normal,
-                          maxLine: 2,
-                          align: TextAlign.center,
-                        ),
-                        // const SizedBox(height: 6),
-                        // if (homeController.selectedIndex == index)
-                        //   Container(
-                        //     width: 100,
-                        //     height: 2,
-                        //     decoration: BoxDecoration(
-                        //         borderRadius: BorderRadius.circular(2),
-                        //         color: AppColors.primary),
-                        //   )
-                      ],
+                      ),
                     ),
                   ),
                 ),

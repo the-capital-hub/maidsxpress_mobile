@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
-import 'package:maidxpress/widget/text_field/text_field.dart';
-import '../../../widget/textwidget/text_widget.dart';
+
 import '../addressScreen/location_screen.dart';
 
 class SelectCityScreen extends StatefulWidget {
@@ -70,13 +69,13 @@ class _SelectCityScreenState extends State<SelectCityScreen> {
         child: Column(
           children: [
             // Title
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   "Select Your City",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -106,9 +105,9 @@ class _SelectCityScreenState extends State<SelectCityScreen> {
             const SizedBox(height: 16),
 
             // Popular Cities
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: const Align(
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   "Popular Cities",

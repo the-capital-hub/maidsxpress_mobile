@@ -22,7 +22,7 @@ class AppButton {
       width: width ?? Get.width,
       height: height ?? 48,
       decoration: BoxDecoration(
-        color: (onButtonPressed == null || isLoading) 
+        color: (onButtonPressed == null || isLoading)
             ? (bgColor ?? AppColors.primary).withOpacity(0.7)
             : bgColor ?? AppColors.primary,
         borderRadius: BorderRadius.circular(borderRadius ?? 100),
@@ -75,6 +75,7 @@ class AppButton {
     double? fontSize,
     double? width,
     Widget? icon,
+    bool isLoading = false, // Added isLoading parameter
   }) {
     return Container(
       width: width ?? Get.width,
@@ -94,16 +95,30 @@ class AppButton {
         ).copyWith(
           shadowColor: MaterialStateProperty.all(Colors.transparent),
         ),
-        onPressed: onButtonPressed,
+        onPressed: isLoading ? null : onButtonPressed,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            if (isLoading) ...[
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary), // Match outline button theme
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
             icon ?? const SizedBox(),
             TextWidget(
               text: title,
               textSize: fontSize ?? 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.black,
+              color: isLoading
+                  ? AppColors.grey // Dim text when loading
+                  : AppColors.black,
             ),
           ],
         ),

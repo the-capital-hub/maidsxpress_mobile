@@ -1,6 +1,6 @@
 class ApiConstants {
   // Base URL
-  static const String baseUrl = 'https://maidxpress.vercel.app/api';
+  static const String baseUrl = 'https://maidsxpress.com/api';
 
   // ================== Auth Endpoints ==================
   static const String loginSendOtp = '/auth/login/send-otp';
@@ -12,8 +12,8 @@ class ApiConstants {
   static const String register = '/auth/register';
 
   // Profile
-  static const String profile = '/auth/me';
-  static const String updateProfile = '/auth/update-profile';
+  static const String profile = '/user/me';
+  static const String updateProfile = '/user/update';
 
   // ================== Service Endpoints ==================
   static const String getServices = '/services/getServices';
@@ -34,6 +34,14 @@ class ApiConstants {
   static String getBookingById(String bookingId) =>
       '/booking/getBookingById/$bookingId';
   static const String getBookings = '/booking/getBookings';
+
+  // ================== Receipt & Coupon Endpoints ==================
+  static String getReceipt(String bookingId) => '/receipt/$bookingId';
+  static const String applyCoupon = '/coupons/apply';
+
+  // ================== Razorpay Payment Endpoints ==================
+  static const String razorpayCreateOrder = '/razorpay';
+  static const String updateVerifiedOrderId = '/booking/updateVerifiedOrderId';
 }
 
 class AppConstants {

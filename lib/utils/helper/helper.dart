@@ -3,7 +3,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../utils/appcolors/app_colors.dart';
-import '../../utils/constant/asset_constant.dart';
+
 import '../../widget/textwidget/text_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 // import 'package:url_launcher/url_launcher.dart';
@@ -33,8 +33,6 @@ class Helper {
         width: double.infinity,
         child: const SpinKitThreeBounce(size: 30, color: AppColors.primary));
   }
-
-  
 
   static showCustomSnackbar(BuildContext context, text) {
     final snackBar = SnackBar(

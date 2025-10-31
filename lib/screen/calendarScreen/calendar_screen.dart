@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:maidxpress/controller/service/service_controller.dart';
 import 'package:maidxpress/screen/homeScreen/serviceCard/service_card_widget.dart';
+import 'package:maidxpress/screen/homeScreen/serviceCard/shimmer_service_card.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
@@ -12,8 +15,18 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  final ServicesController _servicesController = Get.find<ServicesController>();
   DateTime selectedDate = DateTime.now();
   DateTime currentMonth = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch services if not already loaded
+    if (_servicesController.services.isEmpty) {
+      _servicesController.getAllServices();
+    }
+  }
 
   // Mock data for bookings with dots
   final Map<String, List<Color>> bookingDots = {
@@ -60,15 +73,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   fontWeight: FontWeight.bold,
                   color: AppColors.black),
 
-              // ListView.builder(
-              //   itemCount: 5,
-              //   shrinkWrap: true,
-              //   physics: const NeverScrollableScrollPhysics(),
-              //   padding: const EdgeInsets.symmetric(vertical: 8),
-              //   itemBuilder: (BuildContext context, int index) {
-              //     return const ServiceCardWidget();
-              //   },
-              // ),
+              const SizedBox(height: 12),
+              Obx(() {
+                if (_servicesController.isLoading.value) {
+                  return ListView.builder(
+                    itemCount: 3,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemBuilder: (context, index) => const Padding(
+                      padding: EdgeInsets.only(bottom: 16.0),
+                      child: ShimmerServiceCard(),
+                    ),
+                  );
+                }
+
+                final services = _servicesController.services;
+                if (services.isEmpty) {
+                  return const Center(
+                    child: Text('No services available'),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: services.length,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: ServiceCardWidget(service: services[index]),
+                    );
+                  },
+                );
+              }),
             ],
           ),
         ),
@@ -151,8 +188,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
     List<Widget> weeks = [];
     DateTime firstDayOfMonth =
         DateTime(currentMonth.year, currentMonth.month, 1);
-    DateTime lastDayOfMonth =
-        DateTime(currentMonth.year, currentMonth.month + 1, 0);
 
     // Get first Monday of the calendar view
     DateTime startDate =

@@ -2,12 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:maidxpress/bindings/app_bindings.dart';
-import 'package:maidxpress/controller/auth/auth_controller.dart';
+
+import 'package:maidxpress/core/network/api_client.dart';
 import 'package:maidxpress/services/auth_service.dart';
 import 'package:maidxpress/screen/authScreen/loginScreen/login_screen.dart';
+import 'package:maidxpress/screen/authScreen/registerScreen/register_screen.dart';
+import 'package:maidxpress/screen/authScreen/registerScreen/register_details_screen.dart';
 import 'package:maidxpress/screen/homeScreen/home_screen.dart';
 import 'package:maidxpress/screen/landingScreen/landing_screen.dart';
 import 'package:maidxpress/screen/onboardingScreen/onboarding_screens.dart';
+import 'package:maidxpress/screen/profileScreen/edit_profile_screen.dart';
+
+import 'screen/paymentOptionScreen/payment_option_screen.dart';
+import 'package:maidxpress/screen/paymentScreen/razorpay_payment_screen.dart';
+import 'package:maidxpress/bindings/payment_binding.dart';
 
 void main() async {
   // Initialize Flutter bindings
@@ -16,9 +24,9 @@ void main() async {
   // Initialize storage
   await GetStorage.init();
 
-  // Initialize services and bindings
+  // Initialize core services first
+  Get.put(ApiClient(), permanent: true);
   Get.put(AuthService(), permanent: true);
-  Get.put(AuthController(), permanent: true);
 
   // Initialize all bindings
   AppBindings().dependencies();
@@ -49,10 +57,25 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       initialRoute: initialRoute,
       getPages: [
-        GetPage(name: '/onboarding', page: () => OnboardingScreen()),
+        GetPage(name: '/onboarding', page: () => const OnboardingScreen()),
         GetPage(name: '/login', page: () => LoginScreen()),
+        GetPage(name: '/register', page: () => const RegisterScreen()),
+        GetPage(name: '/register-details', page: () => const RegisterDetailsScreen()),
         GetPage(name: '/landing', page: () => const LandingScreen()),
         GetPage(name: '/home', page: () => const HomeScreen()),
+        GetPage(name: '/paymentOptions', page: () => const PaymentOptionsScreen()),
+        GetPage(
+          name: '/razorpayPayment', 
+          page: () => RazorpayPaymentScreen(
+            booking: Get.arguments['booking'],
+            amount: Get.arguments['amount'],
+            userEmail: Get.arguments['userEmail'],
+            userPhone: Get.arguments['userPhone'],
+          ),
+          binding: PaymentBinding(),
+        ),
+        
+        GetPage(name: '/edit-profile', page: () => const EditProfileScreen()),
       ],
       theme: ThemeData(
         useMaterial3: true,

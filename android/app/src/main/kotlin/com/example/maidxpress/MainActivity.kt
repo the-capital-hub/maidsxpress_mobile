@@ -1,4 +1,4 @@
-package com.example.maidxpress
+package com.maidsxpressservices.app
 
 import io.flutter.embedding.android.FlutterActivity
 

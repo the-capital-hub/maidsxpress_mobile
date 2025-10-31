@@ -8,6 +8,8 @@ class UserModel {
   final String? gender;
   final String? profilePicture;
   final String? token;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   UserModel({
     required this.id,
@@ -19,19 +21,23 @@ class UserModel {
     this.gender,
     this.profilePicture,
     this.token,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['_id'] ?? json['id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'],
-      city: json['city'],
-      address: json['address'],
-      gender: json['gender'],
-      profilePicture: json['profilePicture'],
-      token: json['token'],
+      id: json['_id']?.toString() ?? json['id']?.toString() ?? '',
+      name: (json['name'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      phone: json['phone']?.toString(),
+      city: json['city']?.toString(),
+      address: json['address']?.toString(),
+      gender: json['gender']?.toString(),
+      profilePicture: json['profilePicture']?.toString(),
+      token: json['token']?.toString(),
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']) : null,
     );
   }
 
@@ -46,7 +52,9 @@ class UserModel {
       'gender': gender,
       'profilePicture': profilePicture,
       'token': token,
-    };
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+    }..removeWhere((key, value) => value == null);
   }
 
   UserModel copyWith({

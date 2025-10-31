@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:maidxpress/services/auth_service.dart';
+import 'package:maidxpress/utils/helper/helper_sncksbar.dart';
 import '../../core/network/api_client.dart';
 import '../../models/address_model.dart';
 import '../../utils/constant/const_data.dart';
@@ -24,11 +25,6 @@ class AddressController extends GetxController {
   void onInit() {
     super.onInit();
     _apiClient = ApiClient();
-
-    // Load addresses when controller initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      loadAddresses();
-    });
   }
 
   @override
@@ -97,13 +93,17 @@ class AddressController extends GetxController {
       if (response.statusCode == 200) {
         final addressResponse = AddressResponse.fromJson(response.data);
         addresses.assignAll(addressResponse.addresses);
-        if (addresses.isNotEmpty && selectedAddress.value == null) {
+        // Maintain a valid selection
+        if (addresses.isEmpty) {
+          selectedAddress.value = null;
+        } else if (selectedAddress.value == null) {
+          selectedAddress.value = addresses.first;
+        } else if (!addresses.any((a) => a.id == selectedAddress.value?.id)) {
           selectedAddress.value = addresses.first;
         }
       } else {
-        Get.snackbar(
-            "Error", response.data["message"] ?? "Failed to load addresses",
-            duration: const Duration(seconds: 4));
+        HelperSnackBar.error(
+            response.data["message"] ?? "Failed to load addresses");
       }
     } catch (e) {
       _handleError(e);
@@ -145,24 +145,33 @@ class AddressController extends GetxController {
         if (landmark != null) 'landmark': landmark,
       };
 
-      final response = await _apiClient.post(ApiConstants.addAddress,
-          data: data,
-          headers: {'Authorization': 'Bearer ${_authService.token}'});
+      final response = await _apiClient.post(
+        ApiConstants.addAddress,
+        data: data,
+        headers: {
+          'Authorization': 'Bearer ${_authService.token}',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Reload addresses to get fresh list
         await loadAddresses();
+        
+        // Show snackbar after a small delay to ensure screen transition is complete
+        Future.delayed(const Duration(milliseconds: 500), () {
+          HelperSnackBar.success('Address added successfully ✓');
+        });
         return true;
       }
 
+      HelperSnackBar.error(response.data?['message'] ?? 'Failed to add address. Try again.');
       return false;
     } catch (e) {
       if (!_isDisposed) {
         debugPrint('Error adding address: $e');
-        Get.snackbar(
-          'Error',
-          'Failed to add address. Please try again.',
-          duration: const Duration(seconds: 3),
-        );
+        HelperSnackBar.error('Failed to add address. Please try again.');
       }
       return false;
     } finally {
@@ -187,24 +196,63 @@ class AddressController extends GetxController {
 
       isLoading.value = true;
 
-      final response = await _apiClient.put(ApiConstants.updateAddress,
-          data: address.toJson(),
-          headers: {'Authorization': 'Bearer ${_authService.token}'});
+      // Create payload with id for the API
+      final updateData = {
+        'id': address.id,
+        'label': address.label,
+        'address': address.address,
+        'phone': address.phone,
+        'pincode': address.pincode,
+        'isServiceable': address.isServiceable,
+      };
 
-      if (response.statusCode == 200) {
-        await loadAddresses();
-        return true;
+      // Try PUT first
+      try {
+        final response = await _apiClient.put(
+          ApiConstants.updateAddress,
+          data: updateData,
+          headers: {
+            'Authorization': 'Bearer ${_authService.token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          await loadAddresses();
+          Future.delayed(const Duration(milliseconds: 500), () {
+            HelperSnackBar.success('Address updated successfully ✓');
+          });
+          return true;
+        }
+      } catch (putError) {
+        debugPrint('PUT failed, trying POST: $putError');
+        
+        final response = await _apiClient.post(
+          ApiConstants.updateAddress,
+          data: updateData,
+          headers: {
+            'Authorization': 'Bearer ${_authService.token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          await loadAddresses();
+          Future.delayed(const Duration(milliseconds: 500), () {
+            HelperSnackBar.success('Address updated successfully ✓');
+          });
+          return true;
+        }
       }
 
+      HelperSnackBar.error('Failed to update address. Try again.');
       return false;
     } catch (e) {
       if (!_isDisposed) {
         debugPrint('Error updating address: $e');
-        Get.snackbar(
-          'Error',
-          'Failed to update address. Please try again.',
-          duration: const Duration(seconds: 3),
-        );
+        HelperSnackBar.error('Failed to update address. Please try again.');
       }
       return false;
     } finally {
@@ -229,32 +277,60 @@ class AddressController extends GetxController {
 
       isLoading.value = true;
 
-      final response = await _apiClient.delete(
-          '${ApiConstants.deleteAddress}/$addressId',
-          headers: {'Authorization': 'Bearer ${_authService.token}'});
+      // Send ID in the request body
+      final deleteData = {
+        'id': addressId,
+      };
 
-      if (response.statusCode == 200) {
-        addresses.removeWhere((address) => address.id == addressId);
-        if (selectedAddress.value?.id == addressId) {
-          selectedAddress.value = addresses.isNotEmpty ? addresses.first : null;
+      // Try POST method with body
+      try {
+        final response = await _apiClient.post(
+          ApiConstants.deleteAddress,
+          data: deleteData,
+          headers: {
+            'Authorization': 'Bearer ${_authService.token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          addresses.removeWhere((addr) => addr.id == addressId);
+          // Fix selection if current was deleted
+          if (selectedAddress.value?.id == addressId) {
+            selectedAddress.value = addresses.isNotEmpty ? addresses.first : null;
+          }
+          return true;
         }
-        Get.snackbar("Success", "Address deleted successfully ✅",
-            duration: const Duration(seconds: 4),
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green,
-            colorText: Colors.white);
-        return true;
+      } catch (postError) {
+        // If POST fails, try DELETE
+        debugPrint('POST method failed, trying DELETE: $postError');
+        
+        final response = await _apiClient.delete(
+          ApiConstants.deleteAddress,
+          data: deleteData,
+          headers: {
+            'Authorization': 'Bearer ${_authService.token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          addresses.removeWhere((addr) => addr.id == addressId);
+          if (selectedAddress.value?.id == addressId) {
+            selectedAddress.value = addresses.isNotEmpty ? addresses.first : null;
+          }
+          return true;
+        }
       }
 
+      HelperSnackBar.error('Failed to delete address. Try again.');
       return false;
     } catch (e) {
       if (!_isDisposed) {
         debugPrint('Error deleting address: $e');
-        Get.snackbar(
-          'Error',
-          'Failed to delete address. Please try again.',
-          duration: const Duration(seconds: 3),
-        );
+        HelperSnackBar.error('Failed to delete address. Please try again.');
       }
       return false;
     } finally {
@@ -290,14 +366,7 @@ class AddressController extends GetxController {
     }
 
     if (!_isDisposed) {
-      Get.snackbar(
-        'Error',
-        message,
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 4),
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      HelperSnackBar.error(message);
 
       // Log the error for debugging
       debugPrint('AddressController Error: $error');

@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../../../models/service_model.dart';
 import '../../../utils/constant/const_data.dart';
+import '../../utils/helper/helper_sncksbar.dart';
 
 class ServicesController extends GetxController {
   static ServicesController get to => Get.find();
@@ -142,13 +142,6 @@ class ServicesController extends GetxController {
         break;
     }
 
-    Get.snackbar(
-      'Error',
-      errorMessage,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 3),
-    );
+    HelperSnackBar.error(errorMessage);
   }
 }

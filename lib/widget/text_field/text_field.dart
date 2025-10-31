@@ -152,10 +152,8 @@ class MyCustomTextField {
                   return 'Password must contain one special character';
                 }
               } else {
-                if (value == '') {
-                  if (valText != null) {
-                    return valText;
-                  }
+                if (value?.isEmpty ?? true) {
+                  return valText;
                 }
               }
               return null;

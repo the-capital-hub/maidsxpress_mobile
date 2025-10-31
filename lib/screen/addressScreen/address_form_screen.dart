@@ -7,6 +7,7 @@ import 'package:maidxpress/widget/text_field/text_field.dart';
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
+import 'package:maidxpress/utils/helper/helper_sncksbar.dart';
 
 class AddressFormScreen extends StatefulWidget {
   final String? addressId; // null → add, non-null → edit
@@ -19,7 +20,7 @@ class AddressFormScreen extends StatefulWidget {
 }
 
 class _AddressFormScreenState extends State<AddressFormScreen> {
-  final AddressController addressController = Get.put(AddressController());
+  final AddressController addressController = Get.find<AddressController>();
   final _formKey = GlobalKey<FormState>();
 
   final _labelController = TextEditingController();
@@ -78,13 +79,12 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
         );
       }
 
-      /// Sirf success par hi back jao
+      // Close form and show snackbar after successful operation
       if (success) {
-        Get.back();
+        Navigator.of(context).pop(); // Use Navigator instead of Get.back to ensure proper context
       }
-      // ❌ Snackbar yaha mat dikhana – controller already correct msg show karega
     } catch (e) {
-      // ❌ Yaha bhi snackbar remove, controller hi error show karega
+      HelperSnackBar.error('Failed to add address. Try again.');
     }
   }
 
@@ -111,8 +111,11 @@ class _AddressFormScreenState extends State<AddressFormScreen> {
       final success = await addressController.deleteAddress(widget.addressId!);
       if (success) {
         Get.back();
+        // Show success after returning to previous screen
+        Future.delayed(const Duration(milliseconds: 200), () {
+          HelperSnackBar.success('Address deleted successfully ✓');
+        });
       }
-      // ❌ Snackbar yaha bhi controller hi karega
     }
   }
 

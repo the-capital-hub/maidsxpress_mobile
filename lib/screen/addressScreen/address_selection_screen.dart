@@ -5,11 +5,11 @@ import 'package:maidxpress/controller/address/address_controller.dart';
 import 'package:maidxpress/models/address_model.dart';
 import 'package:maidxpress/screen/addressScreen/address_form_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
-import 'package:maidxpress/utils/constant/app_var.dart';
 import 'package:maidxpress/widget/appbar/appbar.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
 import 'package:maidxpress/widget/textwidget/text_widget.dart';
-import '../orderConfirmScreen/order_summary_screen.dart';
+import 'package:maidxpress/screen/orderConfirmScreen/order_summary_screen.dart';
+import 'package:maidxpress/models/service_model.dart';
 
 class AddressSelectionScreen extends StatefulWidget {
   const AddressSelectionScreen({super.key});
@@ -21,6 +21,18 @@ class AddressSelectionScreen extends StatefulWidget {
 class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
   final AddressController _addressController = Get.put(AddressController());
   int selectedAddressIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load addresses when screen opens
+    _addressController.loadAddresses();
+  }
+
+  // Refresh when coming back from add/edit screen
+  Future<void> _refreshData() async {
+    await _addressController.loadAddresses();
+  }
 
   String _formatAddress(Address address) {
     return '${address.address}, ${address.pincode}';
@@ -44,7 +56,10 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
       appBar: HelperAppBar.appbarHelper(title: "Location"),
       body: Obx(() {
         if (_addressController.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: CircularProgressIndicator(
+            color: AppColors.primary,
+          ));
         }
 
         if (_addressController.addresses.isEmpty) {
@@ -59,8 +74,9 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                 ),
                 const SizedBox(height: 16),
                 AppButton.outlineButton(
-                  onButtonPressed: () {
-                    Get.to(() => const AddressFormScreen());
+                  onButtonPressed: () async {
+                    await Get.to(() => const AddressFormScreen());
+                    await _refreshData();
                   },
                   borderColor: AppColors.primary,
                   title: "+ Add New Address",
@@ -74,6 +90,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
           children: [
             Expanded(
               child: RefreshIndicator(
+                color: AppColors.primary,
                 onRefresh: () async {
                   await _addressController.loadAddresses();
                 },
@@ -88,7 +105,7 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                       delay: Duration(milliseconds: 100 * index),
                       child: Card(
                         color: AppColors.white,
-                        elevation: 2,
+                        elevation: 0.5,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -130,94 +147,106 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
                                   const Icon(Icons.call,
                                       size: 14, color: AppColors.black54),
                                   const SizedBox(width: 4),
-                                  TextWidget(
-                                    text: address.phone,
-                                    textSize: 12,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.black,
+                                  Expanded(
+                                    child: TextWidget(
+                                      text: address.phone,
+                                      textSize: 12,
+                                      fontWeight: FontWeight.w400,
+                                      color: Colors.black,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit,
-                                    color: AppColors.primary, size: 20),
-                                onPressed: () {
-                                  Get.to(() => AddressFormScreen(
-                                        addressId: address.id,
-                                        initialData: {
-                                          'label': address.label,
-                                          'address': address.address,
-                                          'phone': address.phone,
-                                          'pincode': address.pincode,
-                                        },
-                                      ));
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Colors.red, size: 20),
-                                onPressed: () async {
-                                  final confirm = await Get.dialog<bool>(
-                                    AlertDialog(
-                                      title: const Text('Delete Address'),
-                                      content: const Text(
-                                          'Are you sure you want to delete this address?'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Get.back(result: false),
-                                          child: const Text('Cancel'),
+                          trailing: ConstrainedBox(
+                            constraints: const BoxConstraints(
+                                maxWidth: 100), // Increased to 150
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: IconButton(
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.edit,
+                                        color: AppColors.primary, size: 20),
+                                    onPressed: () async {
+                                      await Get.to(() => AddressFormScreen(
+                                            addressId: address.id,
+                                            initialData: {
+                                              'label': address.label,
+                                              'address': address.address,
+                                              'phone': address.phone,
+                                              'pincode': address.pincode,
+                                            },
+                                          ));
+                                      await _refreshData();
+                                    },
+                                  ),
+                                ),
+                                Flexible(
+                                  child: IconButton(
+                                    padding: const EdgeInsets.all(4),
+                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red, size: 20),
+                                    onPressed: () async {
+                                      final confirm = await Get.dialog<bool>(
+                                        AlertDialog(
+                                          title: const Text('Delete Address'),
+                                          content: const Text(
+                                              'Are you sure you want to delete this address?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Get.back(result: false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Get.back(result: true),
+                                              child: const Text('Delete'),
+                                            ),
+                                          ],
                                         ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Get.back(result: true),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                                      );
 
-                                  if (confirm == true) {
-                                    final success = await _addressController
-                                        .deleteAddress(address.id);
-                                    if (success) {
-                                      await _addressController.loadAddresses();
-                                      Get.snackbar(
-                                        'Success',
-                                        'Address deleted successfully',
-                                        snackPosition: SnackPosition.BOTTOM,
-                                        backgroundColor: Colors.green,
-                                        colorText: Colors.white,
-                                      );
-                                    } else {
-                                      Get.snackbar(
-                                        'Error',
-                                        'Failed to delete address',
-                                        snackPosition: SnackPosition.BOTTOM,
-                                        backgroundColor: Colors.red,
-                                        colorText: Colors.white,
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                              Radio<int>(
-                                value: index,
-                                groupValue: selectedAddressIndex,
-                                activeColor: AppColors.primary,
-                                onChanged: (val) {
-                                  setState(() {
-                                    selectedAddressIndex = val!;
-                                  });
-                                  _addressController.selectAddress(address);
-                                },
-                              ),
-                            ],
+                                      if (confirm == true) {
+                                        final success = await _addressController
+                                            .deleteAddress(address.id);
+                                        if (success) {
+                                          // Show success message after deletion
+                                          Get.snackbar(
+                                            'Success',
+                                            'Address deleted successfully ✓',
+                                            snackPosition: SnackPosition.BOTTOM,
+                                            backgroundColor: Colors.green,
+                                            colorText: Colors.white,
+                                            duration: const Duration(seconds: 2),
+                                          );
+                                        }
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 4), // Added spacer
+                                Flexible(
+                                  child: Radio<int>(
+                                    value: index,
+                                    groupValue: selectedAddressIndex,
+                                    activeColor: AppColors.primary,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        selectedAddressIndex = val!;
+                                      });
+                                      _addressController.selectAddress(address);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -231,34 +260,43 @@ class _AddressSelectionScreenState extends State<AddressSelectionScreen> {
               child: Column(
                 children: [
                   AppButton.outlineButton(
-                    onButtonPressed: () {
-                      Get.to(() => const AddressFormScreen());
+                    onButtonPressed: () async {
+                      await Get.to(() => const AddressFormScreen());
+                      await _refreshData();
                     },
                     borderColor: AppColors.primary,
                     title: "+ Add New Address",
                   ),
-                  sizedTextfield,
+                  const SizedBox(height: 16),
                   AppButton.primaryButton(
                     onButtonPressed: () {
                       if (_addressController.selectedAddress.value != null) {
-                        // Get the arguments passed to this screen
                         final Map<String, dynamic> args = Get.arguments ?? {};
-                        
-                        // Print received arguments for debugging
-                        print('Received in address screen:');
-                        print('Selected Date: ${args['selectedDate']}');
-                        print('Selected Time: ${args['selectedTime']}');
-                        print('Total Price: ${args['totalPrice']}');
-                        print('Selected Options: ${args['selectedOptions']}');
-                        
-                        // Navigate to OrderSummaryScreen with all required parameters
+                        print('Received in AddressSelectionScreen: $args');
                         Get.to(() => OrderSummaryScreen(
-                          service: args['service'],
-                          selectedOptions: Map<String, String>.from(args['selectedOptions'] ?? {}),
-                          selectedAddress: _addressController.selectedAddress.value,
-                          selectedDate: args['selectedDate'] ?? DateTime.now(),
-                          selectedTime: args['selectedTime'] ?? 'Not specified',
-                        ));
+                              service: args['service'] ??
+                                  Service(
+                                      id: '',
+                                      name: '',
+                                      tag: '',
+                                      image: '',
+                                      include: [],
+                                      exclude: [],
+                                      subServices: [],
+                                      isFavorite: false),
+                              selectedOptions:
+                                  Map<String, Map<String, dynamic>>.from(
+                                      args['selectedOptions'] ?? {}),
+                              selectedDate: args['selectedDate'] is DateTime
+                                  ? args['selectedDate']
+                                  : DateTime.now(),
+                              selectedTime: args['selectedTime']?.toString() ??
+                                  'Not specified',
+                              selectedAddress:
+                                  _addressController.selectedAddress.value!,
+                              genderPreference:
+                                  args['genderPreference']?.toString(),
+                            ));
                       } else {
                         Get.snackbar(
                           'Error',

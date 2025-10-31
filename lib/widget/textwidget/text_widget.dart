@@ -20,6 +20,7 @@ class TextWidget extends StatelessWidget {
   final int? maxLines;
 
   final TextSpan? textSpan;
+  // ignore: use_super_parameters
   const TextWidget({
     Key? key,
     required this.text,

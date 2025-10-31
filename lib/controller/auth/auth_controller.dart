@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:maidxpress/utils/helper/helper_sncksbar.dart';
 
 import '../../../models/user_model.dart';
 import '../../../services/auth_service.dart';
@@ -112,11 +113,11 @@ class AuthController extends GetxController {
         final storage = GetStorage();
         await storage.write('token', userData.token);
         await storage.write('user', userData.toJson());
-        
+
         // Update auth state
         user.value = userData;
         _dio.options.headers['Authorization'] = 'Bearer ${userData.token}';
-        
+
         return true;
       }
       return false;
@@ -128,13 +129,17 @@ class AuthController extends GetxController {
     }
   }
 
-  // Send OTP for registration
-  Future<bool> sendRegisterOtp({required String phoneOrEmail}) async {
+  // Send OTP for registration (supports sending both phone and email)
+  Future<bool> sendRegisterOtp({String? phone, String? email}) async {
     try {
       isLoading.value = true;
+      final Map<String, dynamic> data = {};
+      if (phone != null && phone.isNotEmpty) data['phone'] = phone;
+      if (email != null && email.isNotEmpty) data['email'] = email;
+
       final response = await _dio.post(
-        ApiConstants.registerSendOtp,
-        data: {'phoneOrEmail': phoneOrEmail},
+        '${ApiConstants.baseUrl}${ApiConstants.registerSendOtp}',
+        data: data,
       );
 
       debugPrint('Register OTP Response: ${response.data}');
@@ -147,16 +152,16 @@ class AuthController extends GetxController {
     }
   }
 
-  // Verify OTP for registration
+  // Verify OTP for registration (requires phone and otp)
   Future<bool> verifyRegisterOtp({
     required String otp,
-    required String phoneOrEmail,
+    required String phone,
   }) async {
     try {
       isLoading.value = true;
       final response = await _dio.post(
-        ApiConstants.registerVerifyOtp,
-        data: {'otp': otp, 'phoneOrEmail': phoneOrEmail},
+        '${ApiConstants.baseUrl}${ApiConstants.registerVerifyOtp}',
+        data: {'otp': otp, 'phone': phone},
       );
 
       if (response.statusCode == 200) {
@@ -175,7 +180,10 @@ class AuthController extends GetxController {
   Future<bool> register(Map<String, dynamic> data) async {
     try {
       isLoading.value = true;
-      final response = await _dio.post(ApiConstants.register, data: data);
+      final response = await _dio.post(
+        '${ApiConstants.baseUrl}${ApiConstants.register}',
+        data: data,
+      );
 
       if (response.statusCode == 200) {
         final userData = UserModel.fromJson(response.data['data']);
@@ -196,7 +204,9 @@ class AuthController extends GetxController {
   Future<bool> getProfile() async {
     try {
       isLoading.value = true;
-      final response = await _dio.get(ApiConstants.profile);
+      final response = await _dio.get(
+        '${ApiConstants.baseUrl}${ApiConstants.profile}',
+      );
 
       if (response.statusCode == 200) {
         final userData = UserModel.fromJson(response.data['data']);
@@ -217,7 +227,10 @@ class AuthController extends GetxController {
   Future<bool> updateProfile(Map<String, dynamic> data) async {
     try {
       isLoading.value = true;
-      final response = await _dio.put(ApiConstants.updateProfile, data: data);
+      final response = await _dio.put(
+        '${ApiConstants.baseUrl}${ApiConstants.updateProfile}',
+        data: data,
+      );
 
       if (response.statusCode == 200) {
         final userData = UserModel.fromJson(response.data['data']);
@@ -263,12 +276,6 @@ class AuthController extends GetxController {
       errorMessage = 'Request timeout. Please try again.';
     }
 
-    Get.snackbar(
-      'Error',
-      errorMessage,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    HelperSnackBar.error(errorMessage);
   }
 }

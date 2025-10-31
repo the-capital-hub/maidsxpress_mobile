@@ -42,4 +42,6 @@ class AppColors {
       end: Alignment.bottomCenter,
       stops: [0, 1],
       tileMode: TileMode.decal);
+
+  static get grey400 => null;
 }

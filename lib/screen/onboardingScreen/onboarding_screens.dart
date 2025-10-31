@@ -10,7 +10,6 @@ import '../../widget/textwidget/text_widget.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 import '../authScreen/loginScreen/login_screen.dart';
-import '../homeScreen/home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -37,7 +36,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       debugPrint('No valid authentication token found');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Get.offAll(() => const LoginScreen());
+          Get.offAll(() => LoginScreen());
         }
       });
       return;
@@ -129,7 +128,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     AppButton.primaryButton(
                         onButtonPressed: () {
                           if (isLast) {
-                            Get.to(() => const LoginScreen());
+                            Get.to(() => LoginScreen());
                           } else {
                             _pageController.nextPage(
                               duration: const Duration(milliseconds: 300),

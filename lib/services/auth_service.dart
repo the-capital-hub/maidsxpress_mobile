@@ -1,5 +1,3 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter/foundation.dart';
 
 import 'package:get_storage/get_storage.dart';
@@ -27,14 +25,16 @@ class AuthService {
       debugPrint('Using token from current user');
       return _currentUser!.token;
     }
-    
+
     // Then check storage for token
     final storedToken = _storage.read('token');
-    if (storedToken != null && storedToken is String && storedToken.isNotEmpty) {
+    if (storedToken != null &&
+        storedToken is String &&
+        storedToken.isNotEmpty) {
       debugPrint('Using token from storage');
       return storedToken;
     }
-    
+
     // If we have user data but no token, try to load from user data
     final userData = _storage.read(AppConstants.userDataKey);
     if (userData != null && userData is Map<String, dynamic>) {
@@ -49,7 +49,7 @@ class AuthService {
         debugPrint('Error parsing user data: $e');
       }
     }
-    
+
     debugPrint('No valid token found');
     return null;
   }
@@ -76,7 +76,7 @@ class AuthService {
     await _storage.remove(AppConstants.userDataKey);
     await _storage.remove('token');
   }
-  
+
   Future<void> clearUserData() async {
     await _clearAuthData();
   }
@@ -85,7 +85,7 @@ class AuthService {
     // Check token directly using the token getter which has all the fallback logic
     final currentToken = token;
     final isLoggedIn = currentToken != null && currentToken.isNotEmpty;
-    
+
     debugPrint('isLoggedIn check - Token valid: $isLoggedIn');
     if (!isLoggedIn) {
       // Clear any partial/invalid data

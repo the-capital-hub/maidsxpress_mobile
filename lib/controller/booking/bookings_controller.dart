@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'dart:developer' as developer;
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'dart:developer' as developer;
+import 'package:maidxpress/utils/helper/helper_sncksbar.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../models/booking_model.dart';
 import '../../../utils/constant/const_data.dart';
+import '../../../models/coupon_model.dart';
+import '../../../utils/debug/booking_debug_helper.dart';
 
 class BookingsController extends GetxController {
   static BookingsController get to => Get.find();
@@ -12,6 +19,13 @@ class BookingsController extends GetxController {
   final RxList<Booking> bookings = <Booking>[].obs;
   final Rx<Booking?> selectedBooking = Rx<Booking?>(null);
   final RxBool isLoading = false.obs;
+  final RxBool hasMore = true.obs;
+  final RxString errorMessage = ''.obs;
+
+  // Pagination
+  int _currentPage = 1;
+  final int _perPage = 10;
+  bool _isLoadingMore = false;
 
   final _dio = Dio(BaseOptions(
     baseUrl: ApiConstants.baseUrl,
@@ -59,6 +73,63 @@ class BookingsController extends GetxController {
     getAllBookings();
   }
 
+  Future<void> downloadReceipt(String receiptId) async {
+    try {
+      isLoading.value = true;
+      developer.log('downloadReceipt: Start for receipt ID: $receiptId');
+
+      final token = _authToken;
+      
+      // Use the correct endpoint: /api/receipt/[orderId or bookingId]
+      // Since baseUrl already includes /api, we just use /receipt/$receiptId
+      final url = '/receipt/$receiptId';
+      final fullUrl = '${_dio.options.baseUrl}$url';
+      
+      developer.log('downloadReceipt: Full URL: $fullUrl');
+      developer.log('downloadReceipt: Token available: ${token != null}');
+
+      final response = await _dio.get(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          validateStatus: (status) => status != null && status < 500,
+          headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
+            'Accept': 'application/pdf',
+          },
+        ),
+      );
+
+      developer.log('downloadReceipt: Response status: ${response.statusCode}');
+      developer.log('downloadReceipt: Response data type: ${response.data.runtimeType}');
+      
+      if (response.statusCode == 200 && response.data is List<int>) {
+        final bytes = List<int>.from(response.data as List<int>);
+        final Directory dir = await getApplicationDocumentsDirectory();
+        final String filePath = '${dir.path}/receipt_$receiptId.pdf';
+        final file = File(filePath);
+        await file.writeAsBytes(bytes, flush: true);
+        developer.log('downloadReceipt: Saved to $filePath');
+        await OpenFilex.open(filePath);
+        HelperSnackBar.success('Receipt downloaded successfully');
+      } else {
+        developer.log('downloadReceipt: Failed status ${response.statusCode}');
+        if (response.statusCode == 404) {
+          HelperSnackBar.error('Receipt not found. Please try again later.');
+        } else {
+          HelperSnackBar.error('Failed to download receipt. Status: ${response.statusCode}');
+        }
+      }
+    } catch (e, stackTrace) {
+      developer.log('downloadReceipt: Exception caught: $e');
+      developer.log('downloadReceipt: Stack trace: $stackTrace');
+      HelperSnackBar.error('Failed to download receipt: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<bool> getAllBookings() async {
     if (_authToken == null) {
       developer.log('getAllBookings: No auth token, will redirect to login');
@@ -79,13 +150,21 @@ class BookingsController extends GetxController {
 
       if (response.statusCode == 200) {
         final result = AllBookingsResponse.fromJson(response.data);
-        bookings.assignAll([
+        final allBookings = [
           ...result.data.bookings.completed,
           ...result.data.bookings.upcoming,
           ...result.data.bookings.cancelled,
-        ].map((b) => Booking.fromJson(b.toJson())).toList());
+        ].map((b) => Booking.fromJson(b.toJson())).toList();
+        
+        // Expand bookings into separate orders
+        final expandedBookings = <Booking>[];
+        for (var booking in allBookings) {
+          expandedBookings.addAll(booking.expandToOrders());
+        }
+        
+        bookings.assignAll(expandedBookings);
         developer.log(
-            'getAllBookings: Successfully loaded ${bookings.length} bookings');
+            'getAllBookings: Successfully loaded ${expandedBookings.length} bookings (expanded from ${allBookings.length} original bookings)');
         return true;
       }
       _handleError(DioException(
@@ -100,6 +179,86 @@ class BookingsController extends GetxController {
     } finally {
       isLoading.value = false;
       developer.log('getAllBookings: Completed, isLoading: ${isLoading.value}');
+    }
+  }
+
+  Future<bool> getBookings({String? status, bool loadMore = false}) async {
+    if (_authToken == null) {
+      developer.log('getBookings: No auth token, will redirect to login');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
+        Get.offAllNamed('/login');
+      });
+      return false;
+    }
+
+    // Don't load more if already loading or no more items
+    if ((_isLoadingMore || !hasMore.value) && loadMore) return false;
+
+    try {
+      if (!loadMore) {
+        isLoading.value = true;
+        _currentPage = 1;
+        hasMore.value = true;
+      } else {
+        _isLoadingMore = true;
+        _currentPage++;
+      }
+
+      final queryParams = {
+        'page': _currentPage,
+        'per_page': _perPage,
+        if (status != null) 'status': status,
+      };
+
+      developer.log(
+          'getBookings: Fetching page $_currentPage with params: $queryParams');
+
+      final response = await _dio.get(
+        ApiConstants.getBookings,
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200) {
+        final result = AllBookingsResponse.fromJson(response.data);
+        final allBookings = [
+          ...result.data.bookings.completed,
+          ...result.data.bookings.upcoming,
+          ...result.data.bookings.cancelled,
+        ].map((b) => Booking.fromJson(b.toJson())).toList();
+
+        // Expand bookings into separate orders
+        final expandedBookings = <Booking>[];
+        for (var booking in allBookings) {
+          expandedBookings.addAll(booking.expandToOrders());
+        }
+
+        if (loadMore) {
+          bookings.addAll(expandedBookings);
+        } else {
+          bookings.assignAll(expandedBookings);
+        }
+
+        // Check if we have more items to load
+        hasMore.value = expandedBookings.length >= _perPage;
+
+        errorMessage.value = '';
+        return true;
+      }
+
+      _handleError(DioException(
+        requestOptions: RequestOptions(path: ApiConstants.getBookings),
+        response: response,
+        type: DioExceptionType.badResponse,
+      ));
+      return false;
+    } catch (e) {
+      final error = _toDioException(e, ApiConstants.getBookings);
+      _handleError(error);
+      return false;
+    } finally {
+      isLoading.value = false;
+      _isLoadingMore = false;
     }
   }
 
@@ -134,9 +293,176 @@ class BookingsController extends GetxController {
     }
   }
 
+  // Get all bookings with optional status filter
+
+  // Load more bookings for current filter
+  Future<void> loadMoreBookings({String? status}) async {
+    if (!_isLoadingMore && hasMore.value) {
+      await getBookings(status: status, loadMore: true);
+    }
+  }
+
+  // Refresh bookings list
+  Future<void> refreshBookings({String? status}) async {
+    await getBookings(status: status, loadMore: false);
+  }
+
+  // Get cancelled bookings with pagination
+  Future<List<Booking>> getCancelledBookings({bool loadMore = false}) async {
+    final success = await getBookings(status: 'cancelled', loadMore: loadMore);
+    return success
+        ? bookings.where((b) => b.bookingStatus == 'cancelled').toList()
+        : [];
+  }
+
+  // Get upcoming bookings with pagination
+  Future<List<Booking>> getUpcomingBookings({bool loadMore = false}) async {
+    final success = await getBookings(status: 'upcoming', loadMore: loadMore);
+    return success
+        ? bookings.where((b) => b.bookingStatus == 'upcoming').toList()
+        : [];
+  }
+
+  // Get completed bookings with pagination
+  Future<List<Booking>> getCompletedBookings({bool loadMore = false}) async {
+    final success = await getBookings(status: 'completed', loadMore: loadMore);
+    return success
+        ? bookings.where((b) => b.bookingStatus == 'completed').toList()
+        : [];
+  }
+
+  // Get in-progress bookings
+  Future<List<Booking>> getInProgressBookings() async {
+    final success = await getBookings(status: 'in-progress');
+    return success
+        ? bookings.where((b) => b.bookingStatus == 'in-progress').toList()
+        : [];
+  }
+
+  // Get booking by ID
+  Future<Booking?> getBooking(String bookingId) async {
+    try {
+      isLoading.value = true;
+      developer.log('getBooking: Fetching booking ID: $bookingId');
+
+      // First check in local list
+      final localBooking = bookings.firstWhereOrNull((b) => b.id == bookingId);
+      if (localBooking != null) {
+        return localBooking;
+      }
+
+      // If not found locally, fetch from API
+      final response = await _dio.get(ApiConstants.getBookingById(bookingId));
+
+      if (response.statusCode == 200) {
+        final bookingData = response.data['data'];
+        if (bookingData != null) {
+          final booking = Booking.fromJson(bookingData);
+          // Add to local list if not exists
+          if (!bookings.any((b) => b.id == booking.id)) {
+            bookings.add(booking);
+          }
+          return booking;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      _handleError(_toDioException(e, 'getBooking'));
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Cancel a booking
+  Future<bool> cancelBooking(String bookingId, {String? reason}) async {
+    try {
+      isLoading.value = true;
+      developer.log('cancelBooking: Cancelling booking ID: $bookingId');
+
+      final response = await _dio.patch(
+        ApiConstants.cancelBooking(bookingId),
+        data: {'cancellationReason': reason},
+      );
+
+      if (response.statusCode == 200) {
+        // Update local booking status
+        final index = bookings.indexWhere((b) => b.id == bookingId);
+        if (index != -1) {
+          final updatedBooking = bookings[index].copyWith(
+            bookingStatus: 'cancelled',
+            updatedAt: DateTime.now(),
+          );
+          bookings[index] = updatedBooking;
+        } else {
+          // If booking not found in local list, refresh the list
+          await getAllBookings();
+        }
+
+        return true;
+      }
+
+      // Handle specific error cases
+      if (response.statusCode != 404) {
+        _handleError(DioException(
+          requestOptions:
+              RequestOptions(path: ApiConstants.cancelBooking(bookingId)),
+          response: response,
+          type: DioExceptionType.badResponse,
+        ));
+      }
+
+      return false;
+    } catch (e) {
+      _handleError(_toDioException(e, 'cancelBooking'));
+      return false;
+    } finally {
+      isLoading.value = false;
+      developer.log('cancelBooking: Completed, isLoading: ${isLoading.value}');
+    }
+  }
+
+  Future<ApplyCouponResult?> applyCoupon({
+    required String code,
+    required num totalAmount,
+  }) async {
+    try {
+      isLoading.value = true;
+      developer.log('applyCoupon: Applying $code on total $totalAmount');
+
+      final response = await _dio.post(
+        ApiConstants.applyCoupon,
+        data: {
+          'code': code,
+          'totalAmount': totalAmount,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final result = ApplyCouponResult.fromJson(
+            Map<String, dynamic>.from(response.data));
+        return result;
+      }
+
+      _handleError(DioException(
+        requestOptions: RequestOptions(path: ApiConstants.applyCoupon),
+        response: response,
+        type: DioExceptionType.badResponse,
+      ));
+      return null;
+    } catch (e) {
+      _handleError(_toDioException(e, ApiConstants.applyCoupon));
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<bool> createBooking(Booking booking) async {
     if (_authToken == null) {
-      developer.log('createBooking: No auth token available, redirecting to login');
+      developer
+          .log('createBooking: No auth token available, redirecting to login');
       Get.offAllNamed('/login');
       return false;
     }
@@ -144,9 +470,11 @@ class BookingsController extends GetxController {
     try {
       isLoading.value = true;
       developer.log('createBooking: Starting booking creation');
-      developer.log('createBooking: Auth token: ${_authToken?.substring(0, 10)}...');
+      developer
+          .log('createBooking: Auth token: ${_authToken?.substring(0, 10)}...');
       developer.log('createBooking: Request payload: ${booking.toJson()}');
-      developer.log('createBooking: Sending POST to ${ApiConstants.createBooking}');
+      developer
+          .log('createBooking: Sending POST to ${ApiConstants.createBooking}');
 
       final response = await _dio.post(
         ApiConstants.createBooking,
@@ -167,12 +495,14 @@ class BookingsController extends GetxController {
         try {
           // Handle different possible response formats
           Map<String, dynamic>? bookingData;
-          
+
           if (response.data is Map) {
             // Case 1: Data is directly in response.data
-            if (response.data['data'] is Map && response.data['data']['booking'] is Map) {
-              bookingData = Map<String, dynamic>.from(response.data['data']['booking']);
-            } 
+            if (response.data['data'] is Map &&
+                response.data['data']['booking'] is Map) {
+              bookingData =
+                  Map<String, dynamic>.from(response.data['data']['booking']);
+            }
             // Case 2: Data is directly in response.data.booking (without 'data' wrapper)
             else if (response.data['booking'] is Map) {
               bookingData = Map<String, dynamic>.from(response.data['booking']);
@@ -187,30 +517,30 @@ class BookingsController extends GetxController {
             try {
               final newBooking = Booking.fromJson(bookingData);
               bookings.add(newBooking);
-              developer.log('createBooking: Successfully added booking ID: ${newBooking.id}');
+              developer.log(
+                  'createBooking: Successfully added booking ID: ${newBooking.id}');
               return true;
             } catch (parseError) {
               developer.log('Error parsing booking data: $parseError');
               developer.log('Problematic booking data: $bookingData');
             }
           }
-          
-          developer.log('createBooking: Unexpected response format: ${response.data}');
+
+          developer.log(
+              'createBooking: Unexpected response format: ${response.data}');
           return true; // Still return true if the response indicates success
-          
         } catch (e) {
           developer.log('Error processing booking response: $e');
           return true; // Still return true if the response status is 200/201
         }
       }
-      
+
       _handleError(DioException(
         requestOptions: RequestOptions(path: ApiConstants.createBooking),
         response: response,
         type: DioExceptionType.badResponse,
       ));
       return false;
-      
     } catch (e, stackTrace) {
       developer.log('Error in createBooking: $e');
       developer.log('Stack trace: $stackTrace');
@@ -222,36 +552,94 @@ class BookingsController extends GetxController {
     }
   }
 
-  Future<bool> cancelBooking(String bookingId) async {
+  Future<Booking?> createBookingReturn(Booking booking) async {
+    if (_authToken == null) {
+      developer
+          .log('createBookingReturn: No auth token available, redirecting to login');
+      Get.offAllNamed('/login');
+      return null;
+    }
+
     try {
       isLoading.value = true;
-      developer.log('cancelBooking: Cancelling booking ID: $bookingId');
-      final response = await _dio.post(ApiConstants.cancelBooking(bookingId));
-      developer.log(
-          'cancelBooking: Response status: ${response.statusCode}, Data: ${response.data}');
+      developer.log('═══════════════════════════════════════════════════════');
+      developer.log('🔐 API CALL #1: CREATE BOOKING');
+      developer.log('═══════════════════════════════════════════════════════');
+      developer.log('📡 FULL URL: https://maidsxpress.com/api/booking/createBooking');
+      developer.log('📡 METHOD: POST');
+      developer.log('📦 FULL REQUEST BODY:');
+      developer.log(json.encode(booking.toJson()));
+      developer.log('📦 Headers:');
+      developer.log('  - Authorization: Bearer ${_authToken!.substring(0, 20)}...');
+      developer.log('  - Content-Type: application/json');
 
-      if (response.statusCode == 200) {
-        bookings.removeWhere((booking) => booking.id == bookingId);
-        if (selectedBooking.value?.id == bookingId) {
-          selectedBooking.value = null;
+      final response = await _dio.post(
+        ApiConstants.createBooking,
+        data: booking.toJson(),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $_authToken',
+            'Content-Type': 'application/json',
+          },
+          validateStatus: (status) => status! < 500,
+        ),
+      );
+
+      developer.log('📥 RESPONSE STATUS: ${response.statusCode}');
+      developer.log('📥 FULL RESPONSE DATA:');
+      developer.log(json.encode(response.data));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Debug the response
+        BookingDebugHelper.debugBookingResponse(response.data);
+        
+        Map<String, dynamic>? bookingData;
+        if (response.data is Map) {
+          if (response.data['data'] is Map &&
+              response.data['data']['booking'] is Map) {
+            bookingData =
+                Map<String, dynamic>.from(response.data['data']['booking']);
+            developer.log('createBookingReturn: Found booking in data.booking');
+          } else if (response.data['booking'] is Map) {
+            bookingData = Map<String, dynamic>.from(response.data['booking']);
+            developer.log('createBookingReturn: Found booking in response.booking');
+          } else if (response.data['_id'] != null) {
+            bookingData = Map<String, dynamic>.from(response.data);
+            developer.log('createBookingReturn: Found booking in response root');
+          }
         }
-        developer
-            .log('cancelBooking: Successfully removed booking ID: $bookingId');
-        return true;
+
+        if (bookingData != null) {
+          developer.log('createBookingReturn: Parsing booking data: $bookingData');
+          final newBooking = Booking.fromJson(bookingData);
+          developer.log('createBookingReturn: Parsed booking - Amount: ${newBooking.amount}');
+          developer.log('createBookingReturn: Parsed booking - Service: ${newBooking.service.name}');
+          developer.log('createBookingReturn: Parsed booking - Selected SubServices: ${newBooking.service.selectedSubServices.length}');
+          
+          if (!bookings.any((b) => b.id == newBooking.id)) {
+            bookings.add(newBooking);
+          }
+          return newBooking;
+        }
+
+        // Fallback: refresh and try to find last booking by createdAt
+        developer.log('createBookingReturn: No booking data found, refreshing bookings');
+        await getAllBookings();
+        return bookings.isNotEmpty ? bookings.last : null;
       }
+
       _handleError(DioException(
-        requestOptions:
-            RequestOptions(path: ApiConstants.cancelBooking(bookingId)),
+        requestOptions: RequestOptions(path: ApiConstants.createBooking),
         response: response,
         type: DioExceptionType.badResponse,
       ));
-      return false;
+      return null;
     } catch (e) {
-      _handleError(_toDioException(e, ApiConstants.cancelBooking(bookingId)));
-      return false;
+      developer.log('Error in createBookingReturn: $e');
+      _handleError(_toDioException(e, ApiConstants.createBooking));
+      return null;
     } finally {
       isLoading.value = false;
-      developer.log('cancelBooking: Completed, isLoading: ${isLoading.value}');
     }
   }
 
@@ -308,16 +696,6 @@ class BookingsController extends GetxController {
 
     developer.log('handleError: Displaying error message: $errorMessage');
     if (Get.isSnackbarOpen) Get.closeCurrentSnackbar();
-    Get.snackbar(
-      'Error',
-      errorMessage,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-      snackStyle: SnackStyle.FLOATING,
-      margin: const EdgeInsets.all(10),
-      borderRadius: 8,
-    );
+    HelperSnackBar.error(errorMessage);
   }
 }

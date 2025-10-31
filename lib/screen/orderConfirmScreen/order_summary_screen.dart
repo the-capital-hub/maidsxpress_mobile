@@ -1,35 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:get_storage/get_storage.dart';
-import 'package:maidxpress/controller/address/address_controller.dart';
-import 'package:maidxpress/controller/booking/bookings_controller.dart';
-import 'package:maidxpress/services/auth_service.dart';
 import 'package:maidxpress/models/address_model.dart';
-import 'package:maidxpress/models/booking_model.dart';
 import 'package:maidxpress/models/service_model.dart';
-import 'package:maidxpress/models/service_model.dart' as service_models;
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
-// App specific imports
-import 'package:maidxpress/widget/textwidget/text_widget.dart';
 import 'package:maidxpress/widget/buttons/button.dart';
-import 'package:maidxpress/widget/appbar/appbar.dart';
-import 'dart:developer' as developer;
+import 'package:maidxpress/widget/textwidget/text_widget.dart';
+import '../selectAreaScreen/select_area_screen.dart';
 
 class OrderSummaryScreen extends StatefulWidget {
-  final service_models.Service service;
-  final Map<String, String> selectedOptions;
-  final Address? selectedAddress;
+  final Service service;
+  final Map<String, dynamic> selectedOptions;
   final DateTime selectedDate;
   final String selectedTime;
+  final Address selectedAddress;
+  final String? genderPreference;
 
   const OrderSummaryScreen({
     super.key,
     required this.service,
     required this.selectedOptions,
-    this.selectedAddress,
     required this.selectedDate,
     required this.selectedTime,
+    required this.selectedAddress,
+    this.genderPreference,
   });
 
   @override
@@ -37,579 +31,450 @@ class OrderSummaryScreen extends StatefulWidget {
 }
 
 class _OrderSummaryScreenState extends State<OrderSummaryScreen> {
-  final BookingsController _bookingsController = Get.find<BookingsController>();
-  final AddressController _addressController = Get.find<AddressController>();
-  bool _isLoading = false;
-  double _totalAmount = 0;
-  static const double _taxRate = 0.18;
-
-  Address? _getSelectedAddress() {
-    return widget.selectedAddress ??
-        _addressController.addresses.firstWhereOrNull(
-          (a) => a.label.toLowerCase() == 'home',
-        ) ??
-        _addressController.addresses.firstOrNull;
-  }
+  final Map<String, int> quantities = {};
 
   @override
   void initState() {
     super.initState();
-
-    // Debug print to check received parameters
-    print('OrderSummaryScreen received:');
-    print('Service: ${widget.service.name}');
-    print('Selected Options: ${widget.selectedOptions}');
-    print('Selected Date: ${widget.selectedDate}');
-    print('Selected Time: ${widget.selectedTime}');
-    print('Selected Address: ${widget.selectedAddress?.address}');
-
-    // Initialize and calculate total
-    _checkAuthAndInitialize();
+    // initialize all selected items with quantity 1
+    widget.selectedOptions.forEach((key, value) {
+      quantities[key] = 1;
+    });
   }
 
-  Future<void> _checkAuthAndInitialize() async {
-    final authService = Get.find<AuthService>();
-    final isLoggedIn = authService.currentUser != null;
-
-    if (!isLoggedIn) {
-      final returnRoute = Get.currentRoute;
-      final args = Get.arguments;
-
-      Get.offAllNamed(
-        '/login',
-        arguments: {
-          'returnRoute': returnRoute,
-          'args': args,
-        },
-      );
-      return;
-    }
-
-    _calculateTotal();
+  double _calculateTotal() {
+    double subtotal = 0.0;
+    widget.selectedOptions.forEach((key, value) {
+      final price = (value['price'] is double)
+          ? value['price'] as double
+          : double.tryParse(value['price']?.toString() ?? '0') ?? 0.0;
+      subtotal += (price * (quantities[key] ?? 1));
+    });
+    final tax = subtotal * 0.18; // 18% GST
+    return subtotal + tax;
   }
 
-  void _calculateTotal() {
+  Map<String, dynamic>? _buildBookingDraft() {
     try {
+      final address = widget.selectedAddress;
+
+      // Validate and use phoneNumber
+      final phoneNumber = address.phone.isNotEmpty ? address.phone : null;
+      if (phoneNumber == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Phone number is required for the selected address')),
+        );
+        return null;
+      }
+
+      final List<Map<String, dynamic>> selectedSubServices = [];
       double subtotal = 0.0;
 
-      // Debug print service details
-      print('Service details:');
-      print('Service Name: ${widget.service.name}');
-      print('Service Subservices: ${widget.service.subServices.length}');
+      widget.selectedOptions.forEach((key, value) {
+        if (value.isNotEmpty) {
+          final price = (value['price'] is double)
+              ? value['price'] as double
+              : double.tryParse(value['price']?.toString() ?? '0') ?? 0.0;
 
-      // Calculate subtotal from selected options
-      for (var subService in widget.service.subServices) {
-        if (widget.selectedOptions.containsKey(subService.key) &&
-            widget.selectedOptions[subService.key]!.isNotEmpty) {
-          final selectedValue = widget.selectedOptions[subService.key];
-          print('Processing subservice: ${subService.key} = $selectedValue');
+          // Get the subservice name from the service's subservices list
+          final subService = widget.service.subServices.firstWhere(
+            (sub) => sub.key == key,
+            orElse: () => SubService(
+              key: key,
+              name: value['label'] ?? key,
+              options: [],
+            ),
+          );
 
-          try {
-            final option = subService.options.firstWhere(
-              (opt) => opt.value == selectedValue,
-              orElse: () {
-                print(
-                    'No matching option found for $selectedValue in ${subService.key}');
-                return subService.options.isNotEmpty
-                    ? subService.options.first
-                    : ServiceOption(
-                        label: 'Default', value: 'default', price: 0.0);
-              },
-            );
-
-            print('Found option: ${option.label} - Price: ${option.price}');
-            subtotal += option.price;
-          } catch (e) {
-            print('Error processing option $selectedValue: $e');
-          }
+          selectedSubServices.add({
+            'key': key,
+            'name': subService.name, // Using the actual subservice name
+            'selectedOption': {
+              'label': value['label'] ?? '',
+              'value': value['value'] ?? '',
+              'price': price,
+            }
+          });
+          subtotal += price * (quantities[key] ?? 1);
         }
-      }
-
-      // Calculate tax and total
-      final tax = subtotal * _taxRate;
-      _totalAmount = subtotal + tax;
-
-      print('Calculated total:');
-      print('Subtotal: $subtotal');
-      print('Tax (${_taxRate * 100}%): $tax');
-      print('Total: $_totalAmount');
-
-      // Force UI update
-      if (mounted) setState(() {});
-    } catch (e) {
-      print('Error in _calculateTotal: $e');
-      _totalAmount = 0.0;
-      if (mounted) setState(() {});
-    }
-  }
-
-  Future<void> _createBooking() async {
-    if (_isLoading) return;
-
-    final authService = Get.find<AuthService>();
-    if (authService.currentUser == null) {
-      final returnRoute = Get.currentRoute;
-      final currentArgs = Get.arguments;
-
-      final prefs = GetStorage();
-      await prefs.write('pending_booking', {
-        'route': returnRoute,
-        'args': currentArgs,
-        'serviceId': widget.service.id,
-        'serviceName': widget.service.name,
-        'selectedOptions': widget.selectedOptions,
-        'selectedDate': widget.selectedDate.toIso8601String(),
-        'selectedTime': widget.selectedTime,
-        'selectedAddressId': widget.selectedAddress?.id,
       });
 
-      Get.offAllNamed(
-        '/login',
-        arguments: {
-          'returnRoute': returnRoute,
-          'args': currentArgs,
-          'fromBooking': true,
+      final taxRate = 0.18; // 18% tax
+      final tax = subtotal * taxRate;
+      final totalAmount = subtotal + tax;
+
+      final bookingDraft = {
+        'title': '${widget.service.name} Booking',
+        'service': {
+          'name': widget.service.name,
+          'tag': widget.service.tag,
+          'selectedSubServices': selectedSubServices,
         },
-      );
-      return;
-    }
-
-    try {
-      setState(() => _isLoading = true);
-
-      // Get and validate the selected address
-      final address = _getSelectedAddress();
-      if (address == null) {
-        Get.snackbar('Error', 'Please add or select a valid address');
-        return;
-      }
-
-      // Ensure address fields are non-empty
-      final addressLabel = address.label.isNotEmpty ? address.label : 'Home';
-      final addressText =
-          address.address.isNotEmpty ? address.address : 'Default Address';
-      final phoneNumber =
-          address.phone.isNotEmpty ? address.phone : '9876543210';
-      final pincode = address.pincode.isNotEmpty ? address.pincode : '400001';
-
-      // Create the booking payload with converted fields
-      final booking = Booking(
-        title: '${widget.service.name} Booking',
-        service: BookingService(
-          id: widget.service.id,
-          name: widget.service.name,
-          tag: widget.service.tag ?? 'service',
-          image: widget.service.image,
-          include:
-              widget.service.include.map((detail) => detail.toJson()).toList(),
-          exclude:
-              widget.service.exclude.map((detail) => detail.toJson()).toList(),
-          subServices:
-              widget.service.subServices.map((sub) => sub.toJson()).toList(),
-          selectedSubServices: widget.service.subServices
-              .where((s) => widget.selectedOptions.containsKey(s.key))
-              .map((s) {
-            final option = s.options.firstWhere(
-              (o) => o.value == widget.selectedOptions[s.key],
-              orElse: () => s.options.first,
-            );
-            return service_models.SubService(
-              key: s.key,
-              name: s.name,
-              options: [option],
-              isSelected: true,
-            ).toJson();
-          }).toList(),
-          isFavorite: widget.service.isFavorite,
-        ),
-        selectTimeAndDate: SelectTimeAndDate(
-          date: DateFormat('yyyy-MM-dd').format(widget.selectedDate),
-          time: widget.selectedTime,
-        ),
-        location: Location(
-          locationAddress: LocationAddress(
-            name: addressLabel,
-            address: addressText,
-          ),
-          phoneNumber: phoneNumber,
-          pincode: pincode,
-        ),
-        transactionNumber: 'TXN${DateTime.now().millisecondsSinceEpoch}',
-        paymentStatus: 'pending',
-        amount: _totalAmount,
-      );
-
-      developer.log('Booking Payload: ${booking.toJson()}');
-
-      // Call the booking controller
-      try {
-        final success = await _bookingsController.createBooking(booking);
-
-        if (success) {
-          // Navigate to home screen after successful booking
-          if (mounted) {
-            Get.offAllNamed('/landing');
-            Get.snackbar(
-              'Success',
-              'Booking created successfully',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: AppColors.green,
-              colorText: AppColors.white,
-              duration: const Duration(seconds: 3),
-            );
+        'selectTimeAndDate': {
+          'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
+          'time': widget.selectedTime,
+          'gender': widget.genderPreference ?? 'Any',
+        },
+        'location': {
+          'phoneNumber': phoneNumber,
+          'locationAddress': {
+            'name': address.label,
+            'address': address.address,
           }
-        } else {
-          if (mounted) {
-            Get.snackbar(
-              'Error',
-              'Failed to create booking',
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: AppColors.redColor,
-              colorText: AppColors.white,
-            );
-          }
-        }
-      } catch (e) {
-        developer.log('Error in booking creation: $e');
-        if (mounted) {
-          Get.snackbar(
-            'Error',
-            'An error occurred while creating the booking',
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: AppColors.redColor,
-            colorText: AppColors.white,
-          );
-        }
-      }
+        },
+        'transactionNumber': 'TXN${DateTime.now().millisecondsSinceEpoch}',
+        'paymentStatus': 'pending',
+        'amount': totalAmount,
+      };
+
+      return bookingDraft;
     } catch (e) {
-      developer.log('Error creating booking: $e');
-      Get.snackbar(
-        'Error',
-        'An error occurred: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.redColor,
-        colorText: AppColors.white,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error preparing booking details')),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      return null;
     }
-  }
-
-  String _formatPrice(double amount) => '₹${amount.toStringAsFixed(2)}';
-
-  String _formatDate(DateTime date) => DateFormat('dd/MM/yyyy').format(date);
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          TextWidget(
-            text: '$label: ',
-            textSize: 14,
-            fontWeight: FontWeight.bold,
-            color: AppColors.black,
-          ),
-          Expanded(
-            child: TextWidget(
-              text: value,
-              textSize: 14,
-              color: AppColors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPriceRow(String label, double amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          TextWidget(
-            text: label,
-            textSize: 14,
-            color: AppColors.black,
-          ),
-          TextWidget(
-            text: '₹${amount.toStringAsFixed(2)}',
-            textSize: 14,
-            fontWeight: FontWeight.bold,
-            color: AppColors.black,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServiceDetails() => Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Main service details
-              Row(
-                children: [
-                  if (widget.service.image != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        widget.service.image!,
-                        width: 60,
-                        height: 60,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          width: 60,
-                          height: 60,
-                          color: AppColors.grey200,
-                          child: const Icon(Icons.image_not_supported,
-                              color: AppColors.black),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextWidget(
-                          text: widget.service.name,
-                          textSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.black,
-                        ),
-                        if (widget.service.tag != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: TextWidget(
-                              text: widget.service.tag!,
-                              textSize: 12,
-                              color: AppColors.grey700,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              // Selected options
-              if (widget.selectedOptions.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Text(
-                  'Selected Items',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ..._buildSelectedOptions(),
-              ],
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildAddressSection() {
-    final address = widget.selectedAddress ??
-        _addressController.addresses.firstWhereOrNull(
-          (a) => a.label.toLowerCase() == 'home',
-        ) ??
-        _addressController.addresses.firstOrNull;
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: address == null
-            ? const TextWidget(
-                text: 'No address selected',
-                textSize: 13,
-                color: AppColors.redColor,
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('Label',
-                      address.label.isNotEmpty ? address.label : 'Home'),
-                  _buildInfoRow('Phone',
-                      address.phone.isNotEmpty ? address.phone : 'N/A'),
-                  _buildInfoRow('Address',
-                      address.address.isNotEmpty ? address.address : 'N/A'),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildDateTimeSection() => Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoRow('Date', _formatDate(widget.selectedDate)),
-              _buildInfoRow('Time', widget.selectedTime),
-            ],
-          ),
-        ),
-      );
-
-  List<Widget> _buildSelectedOptions() {
-    final List<Widget> options = [];
-
-    // Filter out unselected or empty options
-    final selectedItems = widget.selectedOptions.entries
-        .where((entry) => entry.value.isNotEmpty)
-        .toList();
-
-    for (var entry in selectedItems) {
-      try {
-        final subService = widget.service.subServices.firstWhere(
-          (s) => s.key == entry.key,
-          orElse: () => SubService(
-            key: entry.key,
-            name: entry.key,
-            options: [
-              ServiceOption(
-                label: entry.value,
-                value: entry.value,
-                price: 0.0,
-              )
-            ],
-          ),
-        );
-
-        final option = subService.options.firstWhere(
-          (opt) => opt.value == entry.value,
-          orElse: () => ServiceOption(
-            label: entry.value,
-            value: entry.value,
-            price: 0.0,
-          ),
-        );
-
-        options.add(
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    '${subService.name}: ${option.label}',
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Text(
-                  '₹${option.price.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      } catch (e) {
-        print('Error building option ${entry.key}: $e');
-      }
-    }
-
-    return options;
-  }
-
-  List<Widget> _buildPriceRows() {
-    final subtotal = _totalAmount / (1 + _taxRate);
-    final tax = _totalAmount - subtotal;
-    return [
-      ..._buildSelectedOptions(),
-      _buildPriceRow('Subtotal', subtotal),
-      _buildPriceRow('Tax (18% GST)', tax),
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextWidget(
-              text: 'Total Amount',
-              textSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.black,
-            ),
-            TextWidget(
-              text: _formatPrice(_totalAmount),
-              textSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary,
-            ),
-          ],
-        ),
-      ),
-    ];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: HelperAppBar.appbarHelper(
-        title: 'Order Summary',
-        bgColor: Colors.transparent,
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        leading: const BackButton(color: AppColors.black),
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const TextWidget(
+          text: "Order Summary",
+          textSize: 18,
+          fontWeight: FontWeight.bold,
+          color: AppColors.black,
+        ),
       ),
-      body: _isLoading
-          ? const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2,
-                ),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildServiceDetails(),
-                  const SizedBox(height: 16),
-                  _buildAddressSection(),
-                  const SizedBox(height: 16),
-                  _buildDateTimeSection(),
-                  const SizedBox(height: 24),
-                  ..._buildPriceRows(),
-                  const SizedBox(height: 24),
-                  AppButton.primaryButton(
-                    onButtonPressed: _isLoading ? null : _createBooking,
-                    title: 'Confirm Booking',
-                    height: 50,
-                    borderRadius: 10,
-                    isLoading: _isLoading,
-                    textColor: Colors.white,
-                    fontSize: 16,
-                    width: double.infinity,
-                  ),
-                ],
-              ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildServiceCard(),
+            const SizedBox(height: 20),
+            _buildSelectedItems(),
+            _buildSelectMoreButton(),
+            const SizedBox(height: 20),
+            _buildBookingSchedule(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  Widget _buildServiceCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // Image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              widget.service.image.isNotEmpty
+                  ? widget.service.image
+                  : "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=150&h=150&fit=crop",
+              width: 90,
+              height: 90,
+              fit: BoxFit.contain,
             ),
+          ),
+          const SizedBox(width: 16),
+
+          // Details
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tag + Rating
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextWidget(
+                        text: widget.service.tag.isNotEmpty
+                            ? widget.service.tag
+                            : "Home Cleaning",
+                        textSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                    const SizedBox(width: 2),
+                    const TextWidget(
+                      text: "4.4 (120 Users)",
+                      textSize: 12,
+                      color: AppColors.grey,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Name
+                TextWidget(
+                  text: widget.service.name,
+                  textSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.black,
+                ),
+                const SizedBox(height: 8),
+
+                // Location + Duration
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on,
+                        color: AppColors.primary, size: 18),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: TextWidget(
+                        text: widget.selectedAddress.address,
+                        textSize: 10,
+                        color: AppColors.grey,
+                        fontWeight: FontWeight.w500,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.access_time,
+                        color: AppColors.primary, size: 18),
+                    const SizedBox(width: 4),
+                    const TextWidget(
+                      text: "3h 40 Mins",
+                      textSize: 10,
+                      color: AppColors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedItems() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const TextWidget(
+          text: "Clothes Selected",
+          textSize: 14,
+          fontWeight: FontWeight.w400,
+          color: AppColors.black,
+        ),
+        const SizedBox(height: 12),
+        ...widget.selectedOptions.entries.map((entry) {
+          final key = entry.key;
+          final value = entry.value;
+          final qty = quantities[key] ?? 1;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextWidget(
+                  text: value['label'] ?? key,
+                  textSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.black,
+                ),
+                Row(
+                  children: [
+                    _quantityButton(Icons.remove, () {
+                      if (qty > 1) {
+                        setState(() {
+                          quantities[key] = qty - 1;
+                        });
+                      }
+                    }),
+                    const SizedBox(width: 12),
+                    TextWidget(
+                      text: qty.toString(),
+                      textSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.black,
+                    ),
+                    const SizedBox(width: 12),
+                    _quantityButton(Icons.add, () {
+                      setState(() {
+                        quantities[key] = qty + 1;
+                      });
+                    }),
+                  ],
+                )
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _quantityButton(IconData icon, VoidCallback onTap) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        color: icon == Icons.remove
+            ? Colors.black26
+            : AppColors.primary, // Grey for minus, primary for add
+        borderRadius: BorderRadius.circular(16), // Circular button
+      ),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: Icon(
+          icon,
+          size: 18,
+          color: Colors.white, // White icon color
+        ),
+        onPressed: onTap,
+      ),
+    );
+  }
+
+  Widget _buildBookingSchedule() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildScheduleCard(
+          "Booking Date",
+          "${DateFormat('MMM dd, yyyy').format(widget.selectedDate)} | ${widget.selectedTime}",
+        ),
+        const SizedBox(height: 8),
+        _buildScheduleCard(
+          "Confirmed Date & Time",
+          "${DateFormat('MMM dd, yyyy').format(widget.selectedDate.add(const Duration(days: 1)))} | ${widget.selectedTime}",
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScheduleCard(String title, String value) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: TextWidget(
+              text: title,
+              textSize: 10,
+              fontWeight: FontWeight.w500,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextWidget(
+            text: value,
+            textSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.black,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectMoreButton() {
+    return Center(
+      child: AppButton.primaryButton(
+        onButtonPressed: () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      SelectAreaScreen(service: widget.service)));
+        },
+        title: "Select More",
+        height: 40,
+        width: 100,
+        borderRadius: 22,
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border(top: BorderSide(color: AppColors.grey200)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextWidget(
+                  text: "₹${_calculateTotal().toStringAsFixed(2)}",
+                  textSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.black,
+                ),
+                const SizedBox(height: 4),
+                const TextWidget(
+                  text: "View Detailed Bill",
+                  textSize: 14,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 1,
+            child: AppButton.primaryButton(
+              onButtonPressed: () {
+                final draft = _buildBookingDraft();
+                if (draft != null) {
+                  Get.toNamed('/paymentOptions', arguments: {
+                    'bookingDraft': draft,
+                    'totalAmount': _calculateTotal(),
+                    'genderPreference': widget.genderPreference,
+                  });
+                }
+              },
+              title: "Proceed to Pay",
+              height: 48,
+              borderRadius: 25,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
