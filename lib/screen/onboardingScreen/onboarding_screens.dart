@@ -31,6 +31,7 @@ class OnboardingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
     final bottomHeight = screenHeight * 0.28;
 
     return Scaffold(
@@ -39,21 +40,19 @@ class OnboardingScreen extends StatelessWidget {
         child: Column(
           children: [
             Expanded(
+              flex: 7, // Takes 70% of available space
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: onboardingData.length,
                 onPageChanged: (index) => currentPage.value = index,
                 itemBuilder: (context, index) {
-                  return ZoomIn(
-                    child: Column(
-                      children: [
-                        Image.asset(
-                          onboardingData[index]["image"]!,
-                          height: screenHeight * 0.68,
-                          width: double.infinity,
-                          fit: BoxFit.fitWidth,
-                        ),
-                      ],
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: ZoomIn(
+                      child: Image.asset(
+                        onboardingData[index]["image"]!,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   );
                 },
@@ -61,8 +60,11 @@ class OnboardingScreen extends StatelessWidget {
             ),
             Container(
               height: bottomHeight,
-              color: AppColors.white,
-              padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxWidth: screenWidth * 0.9,
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Obx(() {
                 final isLast = currentPage.value == onboardingData.length - 1;
                 return Column(

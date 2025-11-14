@@ -1,6 +1,8 @@
 import 'package:animate_do/animate_do.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart'; // if you use GetX
+import 'package:maidxpress/screen/mapLocationScreen/map_location_screen.dart';
+import 'package:maidxpress/screen/paymentOptionScreen/payment_Option_Screen.dart';
 import 'package:maidxpress/screen/profileScreen/bookingHistoryScreen/booking_history_screen.dart';
 import 'package:maidxpress/utils/appcolors/app_colors.dart';
 import 'package:maidxpress/utils/constant/app_var.dart';
@@ -90,11 +92,15 @@ class ProfileScreen extends StatelessWidget {
                           title: "Privacy Settings"),
                       _buildTile(
                           icon: Icons.payment,
-                          onTap: () {},
+                          onTap: () {
+                            Get.to(() => const PaymentOptionsScreen());
+                          },
                           title: "Payment Methods"),
                       _buildTile(
                           icon: Icons.help_outline,
-                          onTap: () {},
+                          onTap: () {
+                            Get.to(() => const MapLocationScreen());
+                          },
                           title: "Help And Support"),
                     ],
                   ),

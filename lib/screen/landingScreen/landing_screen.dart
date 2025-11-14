@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:maidxpress/screen/calendarScreen/calendar_screen.dart';
 import 'package:maidxpress/screen/profileScreen/profile_screen.dart';
 
 import '../../controller/homeController/home_controller.dart';
@@ -44,7 +45,7 @@ class _LandingScreenState extends State<LandingScreen> {
   List screen = [
     HomeScreen(),
     BookingScreen(),
-    SizedBox(),
+    CalendarScreen(),
     // SizedBox(),
     FavouriteServiceScreen(),
     ProfileScreen(),
